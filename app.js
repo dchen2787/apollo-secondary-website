@@ -370,7 +370,7 @@ app.post("/login", function(req,res){ //STUDENT LOGIN
           }
         });
       } else {
-        res.render("login", {errM:"", errM2:"Account not activated. Please activate your account (https://apolloprogram-match.herokuapp.com/activate-account) or contact apolloyimde@gmail.com."});
+        res.render("login", {errM:"", errM2:"Account not activated. Please activate your account (https://the-match-apolloyim-2f158c0ae122.herokuapp.com/activate-account) or contact apolloyimde@gmail.com."});
       }
       }
     }
