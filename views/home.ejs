@@ -83,11 +83,51 @@
 <!-- <h4>You may pick up to 1 slot at this time. Any matches listed above are saved and Apollo will confirm your slots via email before June 28.</h4> -->
 <br /><br /><br /><br />
 
-
-
+<%
+  // sorted list of specialties from the slots rendered
+  var specialties = [];
+  slots.forEach(function(s){
+    if (s.physSpecialty) {
+      const spec = (s.physSpecialty || '').trim();
+      if (specialties.indexOf(spec) === -1) specialties.push(spec);
+    }
+  });
+  specialties.sort();
+%>
 
 <h1>Shadow Slots</h1><br/>
-<% const pcpOnly = controls && controls.PCPonly === true; %>  <!-- add this -->
+<!-- Filter Bar -->
+<div style="margin: 0.5rem 0 1rem; padding: 0.75rem; background: #f8f8f8; border: 1px solid #ccc; border-radius:6px;">
+  <div class="row">
+    <div class="col-12 col-md-4" style="margin-bottom:.5rem;">
+      <input id="slotSearch" class="form-control" placeholder="Search by physician or specialty">
+    </div>
+
+    <div class="col-12 col-md-5" style="margin-bottom:.5rem;">
+      <label class="mb-1" for="specFilter">Specialties (choose one or more):</label>
+      <select id="specFilter" class="form-control" multiple size="<%= Math.min(8, Math.max(3, specialties.length)) %>">
+        <% specialties.forEach(function(spec){ %>
+          <option value="<%= spec %>"><%= spec %></option>
+        <% }) %>
+      </select>
+      <small style="opacity:.7;">Tip: Ctrl/Cmd‑click to select multiple.</small>
+    </div>
+
+    <div class="col-6 col-md-2 d-flex align-items-center" style="margin-bottom:.5rem;">
+      <label class="mb-0">
+        <input id="onlyUnclaimed" type="checkbox" style="margin-right:6px;">
+        Only unclaimed
+      </label>
+    </div>
+
+    <div class="col-6 col-md-1 d-flex align-items-center" style="margin-bottom:.5rem;">
+      <button id="resetFilters" type="button" class="btn btn-light w-100">Reset</button>
+    </div>
+  </div>
+</div>
+
+
+<% const pcpOnly = controls && controls.PCPonly === true; %>
 
 <!-- <p>Please remember, all slots currently listed below fall under the category of Primary Care. More specialty slots will be available starting Wednesday, 10/20.</p><br/><br/> -->
 <!-- <div class="container"> -->
@@ -117,7 +157,11 @@
   <!-- slot.physSpecialty.includes("Primary Care") -->
   <% if(true){%>
 
-<div class="row">
+<div class="row slot-row"
+     data-phys="<%= (slot.physName || '').toLowerCase() %>"
+     data-spec="<%= (slot.physSpecialty || '').toLowerCase() %>"
+     data-filled="<%= (slot.studentEmail && slot.studentEmail.length>0) ? 'true' : 'false' %>">
+
       <div class="col col-12 col-lg-2">
         <%= slot.physName %>, <%=slot.physSpecialty %>
       </div>
@@ -167,5 +211,64 @@
 <%  } %>
 </div>
 
+
+<!-- filter logic -->
+
+<script>
+(function(){
+  const q  = s => document.querySelector(s);
+  const qa = s => Array.from(document.querySelectorAll(s));
+
+  const search     = q('#slotSearch');
+  const specSel    = q('#specFilter');
+  const unclaimed  = q('#onlyUnclaimed');
+  const resetBtn   = q('#resetFilters');
+  const rows       = qa('.slot-row');
+
+  function selectedSpecs() {
+    return Array.from(specSel.selectedOptions).map(o => (o.value || '').toLowerCase());
+  }
+
+  function applyFilters() {
+    const term = (search?.value || '').trim().toLowerCase();
+    const specs = selectedSpecs(); // array of lowercased specialties
+    const wantOnlyUnclaimed = !!(unclaimed && unclaimed.checked);
+
+    rows.forEach(row => {
+      const name = row.dataset.phys || '';
+      const spec = row.dataset.spec || '';
+      const isFilled = row.dataset.filled === 'true';
+
+      let ok = true;
+
+      if (term) {
+        ok = name.includes(term) || spec.includes(term);
+      }
+      if (ok && specs.length > 0) {
+        ok = specs.includes(spec);
+      }
+      if (ok && wantOnlyUnclaimed) {
+        ok = !isFilled;
+      }
+
+      row.style.display = ok ? '' : 'none';
+    });
+  }
+
+  function resetFilters() {
+    if (search) search.value = '';
+    if (specSel) Array.from(specSel.options).forEach(o => o.selected = false);
+    if (unclaimed) unclaimed.checked = false;
+    applyFilters();
+  }
+
+  search?.addEventListener('input', applyFilters);
+  specSel?.addEventListener('change', applyFilters);
+  unclaimed?.addEventListener('change', applyFilters);
+  resetBtn?.addEventListener('click', resetFilters);
+
+  applyFilters();
+})();
+</script>
 
 <%- include("./partials/footer"); -%>
