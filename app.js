@@ -117,7 +117,7 @@ function initConfirm(){
         newConfirm.save(function(err){
           if(err){
             console.log(err);
-            errorPage(err);
+            errorPage(res, err);
           } else {
             console.log("Confirm saved for "+thisStudent.email);
           }
@@ -156,7 +156,7 @@ function makeLog(type, user, update, slot){
         newLog.save(function(err){
           if(err){
             console.log(err);
-            errorPage(err);
+            errorPage(res, err);
           } else {
             console.log("Log saved");
           }
@@ -261,8 +261,8 @@ function checkPCP(array){
 }
 
 
-function errorPage(err){
-  res.render("error", {errM:err});
+function errorPage(res, err) {
+  return res.render("error", { errM: err });
 }
 
 //GET
@@ -316,7 +316,7 @@ app.post("/activate-account", function(req,res){
                     Slot.find(function(err,slots){
                       if(err){
                         console.log(err);
-                        errorPage(err);
+                        errorPage(res, err);
                       } else {
                         console.log("SUCCESS");
                         const array = setDisplayValues(slots);
@@ -360,7 +360,7 @@ app.post("/login", function(req,res){ //STUDENT LOGIN
               Slot.find(function(err,slots){
                 if(err){
                   console.log(err);
-                  errorPage(err);
+                  errorPage(res, err);
                 } else {
                   // let matchingLocked = setMatchingLocked(foundUser);
                   const array = setDisplayValues(slots);
@@ -399,16 +399,21 @@ app.post("/admin-login", function(req,res){
               Slot.find(function(err,slots){
                 if(err){
                   console.log(err);
-                  errorPage(err);
+                  errorPage(res, err);
                 } else {
                   updateGroups();
                   const array = setDisplayValues(slots);
                   Confirm.find(function(err,confirms){
                     if(err){
                       console.log(err);
-                      errorPage(err);
+                      errorPage(res, err);
                     } else {
-                    res.render("admin-home", {slots:array, (res.locals.controls && res.locals.controls.maxSlots) || maxSlots, allGroups:allGroups.sort(), confirms:confirms});
+                    res.render("admin-home", {
+                      slots: array,
+                      maxSlots: (res.locals.controls && res.locals.controls.maxSlots) || maxSlots,
+                      allGroups: allGroups.sort(),
+                      confirms: confirms
+                    });
                     }
                   });
                 }
@@ -435,23 +440,29 @@ app.post("/claim", function(req,res){
   Slot.findOne({_id:slotId}, function(err,thisSlot){
     if(err){
       console.log(err);
-      errorPage(err);
+      errorPage(res, err);
     } else {
       if (thisSlot.studentEmail){ // in case page isn't reloaded and someone else already claimed the slot
         if (thisSlot.studentEmail.length>0){ // works with new default of "" rather than null
           Student.findOne({email:userEmail},function(err,foundUser){
             if(err){
               console.log(err);
-              errorPage(err);
+              errorPage(res, err);
             } else {
               Slot.find(function(err,slots){
                 if(err){
                   console.log(err);
-                  errorPage(err);
+                  errorPage(res, err);
                 } else {
                   const array = setDisplayValues(slots);
                   makeLog("Claim: already claimed", userEmail, slotId, slotId);
-                  res.render("home", {user:foundUser, slots:array, controls: res.locals.controls, (res.locals.controls && res.locals.controls.maxSlots) || maxSlots, errM:"This slot was already claimed. Please reload the page frequently to see all available shadow slots."});
+                  res.render("home", {
+                    user: foundUser,
+                    slots: array,
+                    controls: res.locals.controls,
+                    maxSlots: (res.locals.controls && res.locals.controls.maxSlots) || maxSlots,
+                    errM: "This slot was already claimed. Please reload the page frequently to see all available shadow slots."
+                  });
                 }
               });
             }
@@ -461,17 +472,17 @@ app.post("/claim", function(req,res){
         Slot.updateOne({_id:slotId},{studentName:userName, studentEmail:userEmail}, function(err){
           if(err){
             console.log(err);
-            errorPage(err);
+            errorPage(res, err);
           } else {
             Student.findOne({email:userEmail},function(err,foundUser){
               if(err){
                 console.log(err);
-                errorPage(err);
+                errorPage(res, err);
               } else {
                 Slot.find(function(err,slots){
                   if(err){
                     console.log(err);
-                    errorPage(err);
+                    errorPage(res, err);
                   } else {
                     const array = setDisplayValues(slots);
                     makeLog("Claim slot", userEmail, slotId, slotId);
@@ -495,17 +506,17 @@ app.post("/unclaim", function(req,res){
   Slot.updateOne({_id:slotId},{studentName:"", studentEmail:""}, function(err){
     if(err){
       console.log(err);
-      errorPage(err);
+      errorPage(res, err);
     } else {
       Student.findOne({email:userEmail},function(err,foundUser){
         if(err){
           console.log(err);
-          errorPage(err);
+          errorPage(res, err);
         } else {
           Slot.find(function(err,slots){
             if(err){
               console.log(err);
-              errorPage(err);
+              errorPage(res, err);
             } else {
               const array = setDisplayValues(slots);
               makeLog("Unclaim", userEmail, slotId, slotId);
@@ -523,17 +534,17 @@ app.post("/confirm", function(req,res){
   Confirm.updateOne({email:userEmail},{confirmed:true}, function(err){
     if(err){
       console.log(err);
-      errorPage(err);
+      errorPage(res, err);
     } else {
       Student.findOne({email:userEmail},function(err,foundUser){
         if(err){
           console.log(err);
-          errorPage(err);
+          errorPage(res, err);
         } else {
           Slot.find(function(err,slots){
             if(err){
               console.log(err);
-              errorPage(err);
+              errorPage(res, err);
             } else {
               const array = setDisplayValues(slots);
               // makeLog("Confirm", userEmail, slotId, slotId);
@@ -562,7 +573,7 @@ app.post("/admin-newAccounts", function(req,res){
       bcrypt.hash(password,saltRounds,function(err,hashedPassword){
         if(err){
           console.log(err);
-          errorPage(err);
+          errorPage(res, err);
         } else {
           console.log("new student");
           const newStudent = new Student ({
@@ -574,7 +585,7 @@ app.post("/admin-newAccounts", function(req,res){
           newStudent.save(function(err){
             if(err){
               console.log(err);
-              errorPage(err);
+              errorPage(res, err);
             } else {
               console.log("Saved");
             }
@@ -601,7 +612,7 @@ app.post("/admin-newAccounts", function(req,res){
       bcrypt.hash(password,saltRounds,function(err,hashedPassword){
         if(err){
           console.log(err);
-          errorPage(err);
+          errorPage(res, err);
         } else {
           const newAdmin = new Admin ({
             fName:fName,
@@ -612,7 +623,7 @@ app.post("/admin-newAccounts", function(req,res){
           newAdmin.save(function(err){
             if(err){
               console.log(err);
-              errorPage(err);
+              errorPage(res, err);
             } else {
               console.log("Saved");
             }
@@ -889,7 +900,7 @@ Slot.find(function(err,slots){
 //     newSlot.save(function(err){
 //       if(err){
 //         console.log(err);
-//         errorPage(err);
+//         errorPage(res, err);
 //       } else {
 //         console.log("Saved slot " + id);
 //       }
