@@ -71,6 +71,16 @@ const Control = mongoose.model("Control", controlSchema);
 
 const thisControl = new Control({maxSlots:1, PCPonly: true, id:1});
 
+app.use(async (req, res, next) => {
+  try {
+    res.locals.controls = await Control.findOne({ id: 1 }).lean();
+  } catch (e) {
+    console.error("Failed to load controls:", e);
+    res.locals.controls = null;
+  }
+  next();
+});
+
 // thisControl.save(function(err){
 //   if(!err){
 //     console.log("Saved control")
@@ -249,12 +259,7 @@ function checkPCP(array){
   console.log("checking")
   // console.log(array);
 }
-function getControl(){
-  console.log("getControl function")
-  Control.findOne({id:1}, function(err, foundControl){
-    return foundControl;
-  });
-}
+
 
 function errorPage(err){
   res.render("error", {errM:err});
@@ -317,7 +322,7 @@ app.post("/activate-account", function(req,res){
                         const array = setDisplayValues(slots);
                         makeLog("Activate account", email, email, " ");
 
-                        res.render("home", {errM:"Account activated!",user:foundUser, slots:array, maxSlots:maxSlots, controls:getControl()});
+                        res.render("home", {errM:"Account activated!",user:foundUser, slots:array, maxSlots: (res.locals.controls && res.locals.controls.maxSlots) || maxSlots, controls: res.locals.controls});
                       }
                     });
                   }
@@ -360,7 +365,7 @@ app.post("/login", function(req,res){ //STUDENT LOGIN
                   // let matchingLocked = setMatchingLocked(foundUser);
                   const array = setDisplayValues(slots);
                   Control.findOne({id:1}, function(err, controls){
-                    res.render("home", {user:foundUser, slots:array, maxSlots:maxSlots, errM:"", controls:controls});
+                    res.render("home", {user:foundUser, slots:array, maxSlots:(res.locals.controls && res.locals.controls.maxSlots) || maxSlots, errM:"", controls:controls});
                   });
                 }
               });
@@ -403,7 +408,7 @@ app.post("/admin-login", function(req,res){
                       console.log(err);
                       errorPage(err);
                     } else {
-                    res.render("admin-home", {slots:array, maxSlots:maxSlots, allGroups:allGroups.sort(), confirms:confirms});
+                    res.render("admin-home", {slots:array, (res.locals.controls && res.locals.controls.maxSlots) || maxSlots, allGroups:allGroups.sort(), confirms:confirms});
                     }
                   });
                 }
@@ -446,7 +451,7 @@ app.post("/claim", function(req,res){
                 } else {
                   const array = setDisplayValues(slots);
                   makeLog("Claim: already claimed", userEmail, slotId, slotId);
-                  res.render("home", {user:foundUser, slots:array, controls:getControl(), maxSlots:maxSlots, errM:"This slot was already claimed. Please reload the page frequently to see all available shadow slots."});
+                  res.render("home", {user:foundUser, slots:array, controls: res.locals.controls, (res.locals.controls && res.locals.controls.maxSlots) || maxSlots, errM:"This slot was already claimed. Please reload the page frequently to see all available shadow slots."});
                 }
               });
             }
@@ -470,7 +475,7 @@ app.post("/claim", function(req,res){
                   } else {
                     const array = setDisplayValues(slots);
                     makeLog("Claim slot", userEmail, slotId, slotId);
-                    res.render("home", {user:foundUser, slots:array, controls:getControl(), maxSlots:maxSlots, errM:"Successfully matched."});
+                    res.render("home", {user:foundUser, slots:array, controls:res.locals.controls, maxSlots:(res.locals.controls && res.locals.controls.maxSlots) || maxSlots, errM:"Successfully matched."});
                   }
                 });
               }
@@ -504,7 +509,7 @@ app.post("/unclaim", function(req,res){
             } else {
               const array = setDisplayValues(slots);
               makeLog("Unclaim", userEmail, slotId, slotId);
-              res.render("home", {user:foundUser, slots:array, controls:getControl(), maxSlots:maxSlots, errM:"Successfully removed slot."});
+              res.render("home", {user:foundUser, slots:array, controls:res.locals.controls, maxSlots:(res.locals.controls && res.locals.controls.maxSlots) || maxSlots, errM:"Successfully removed slot."});
             }
           });
         }
@@ -532,7 +537,7 @@ app.post("/confirm", function(req,res){
             } else {
               const array = setDisplayValues(slots);
               // makeLog("Confirm", userEmail, slotId, slotId);
-              res.render("home", {user:foundUser, slots:array, controls:getControl(), maxSlots:maxSlots, errM:"Successfully confirmed your slots."});
+              res.render("home", {user:foundUser, slots:array, controls:res.locals.controls, maxSlots:(res.locals.controls && res.locals.controls.maxSlots) || maxSlots, errM:"Successfully confirmed your slots."});
             }
           });
         }
