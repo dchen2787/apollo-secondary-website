@@ -71,6 +71,17 @@ const Control = mongoose.model("Control", controlSchema);
 
 const thisControl = new Control({maxSlots:1, PCPonly: true, id:1});
 
+// ---- PCP helpers ----
+// adjust to match your exact physSpecialty strings
+const ALLOWED_PCP = new Set([
+  "Family Medicine (PCP)",
+  "Primary Care"
+]);
+
+function isPCPSlot(slot) {
+  return ALLOWED_PCP.has((slot.physSpecialty || "").trim());
+}
+
 app.use(async (req, res, next) => {
   try {
     res.locals.controls = await Control.findOne({ id: 1 }).lean();
@@ -198,6 +209,7 @@ function setDisplayValues(slots){
     //   x.dTime = xTimeStart.concat(':',xTimeSM,ind1,' to ', xTimeEnd,':',xTimeEM,ind2);
     // }
     // console.log(x.timeStart);
+    x.isPCP = isPCPSlot(x);   // <-- NEW: tag each slot
     xArray.push(x);
   });
     // console.log(xArray);
