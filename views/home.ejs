@@ -9,7 +9,7 @@
       </h6>
     </div>
   <%}%>
-<% if(user.matchingLocked == true){ %>
+<% if (controls && controls.matchingLocked === true) { %>
   <h1>Your Matches</h1>
   <% var count = 0 %>
   <% slots.forEach(function(slot){ %>
