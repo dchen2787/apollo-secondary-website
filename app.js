@@ -620,22 +620,27 @@ app.post("/admin-newAccounts", function(req,res){
   res.redirect("/");
 });
 
-app.post("/admin-matchSettings", function(req,res){
-  maxSlots = req.body.maxSlots;
-  matchingLocked = req.body.matchingLock; //not needed?
-  var checkedBoxes = [];
+app.post("/admin-matchSettings", function(req, res) {
+  const maxSlots = parseInt(req.body.maxSlots);
+  const lockValue = req.body.matchingLock === "true"; // convert string to boolean
 
-  for (let i = 0; i<allGroups.length; i++) {
+  // Keep your group checkbox handling
+  var checkedBoxes = [];
+  for (let i = 0; i < allGroups.length; i++) {
     const box = req.body[allGroups[i][0]];
-    if(box){
-      allGroups[i][1] = true;
-    } else {
-      allGroups[i][1] = false;
-    }
+    allGroups[i][1] = !!box;
   }
   console.log(allGroups);
 
-  res.redirect("/");
+  // NEW: Persist lock state to all students in DB
+  Student.updateMany({}, { matchingLocked: lockValue }, function(err, result) {
+    if (err) {
+      console.error("Error updating students:", err);
+    } else {
+      console.log(`Updated ${result.modifiedCount} students to matchingLocked=${lockValue}`);
+    }
+    res.redirect("/");
+  });
 });
 
 // app.post("/admin-emails", function(req,res){
