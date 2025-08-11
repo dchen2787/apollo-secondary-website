@@ -69,7 +69,6 @@ const controlSchema = new mongoose.Schema({
 })
 const Control = mongoose.model("Control", controlSchema);
 
-const thisControl = new Control({maxSlots:1, PCPonly: true, id:1});
 
 // ---- PCP helpers ----
 // adjust to match your exact physSpecialty strings
@@ -454,6 +453,30 @@ app.post("/claim", function(req,res){
       console.log(err);
       errorPage(res, err);
     } else {
+      //PCP only gaurd
+      const pcpOnly = res.locals.controls && res.locals.controls.PCPonly === true;
+      if (pcpOnly && !isPCPSlot(thisSlot)) {
+        return Student.findOne({ email: userEmail }, function(err, foundUser) {
+        if (err) {
+          console.log(err); 
+          return errorPage(res, err); 
+        }
+        Slot.find(function(err, slots){
+          if (err) { 
+            console.log(err); 
+            return errorPage(res, err); 
+          }
+          const array = setDisplayValues(slots);
+          return res.render("home", {
+            user: foundUser,
+            slots: array,
+            controls: res.locals.controls,
+            maxSlots: (res.locals.controls && res.locals.controls.maxSlots) || maxSlots,
+            errM: "PCP-only is active. You can only claim primary-care slots right now."
+          });
+        });
+      });
+    }
       if (thisSlot.studentEmail){ // in case page isn't reloaded and someone else already claimed the slot
         if (thisSlot.studentEmail.length>0){ // works with new default of "" rather than null
           Student.findOne({email:userEmail},function(err,foundUser){
