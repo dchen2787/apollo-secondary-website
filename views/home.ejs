@@ -104,13 +104,24 @@
     </div>
 
     <div class="col-12 col-md-5" style="margin-bottom:.5rem;">
-      <label class="mb-1" for="specFilter">Specialties (choose one or more):</label>
-      <select id="specFilter" class="form-control" multiple size="<%= Math.min(8, Math.max(3, specialties.length)) %>">
-        <% specialties.forEach(function(spec){ %>
-          <option value="<%= spec %>"><%= spec %></option>
-        <% }) %>
-      </select>
-      <small style="opacity:.7;">Tip: Ctrl/Cmd‑click to select multiple.</small>
+      <div class="dropdown">
+        <button class="btn btn-light dropdown-toggle w-100" type="button" id="specDropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+          Specialties (multi-select)
+        </button>
+        <div class="dropdown-menu w-100 p-2" aria-labelledby="specDropdown" style="max-height: 260px; overflow:auto;">
+          <label class="dropdown-item mb-1">
+            <input type="checkbox" id="specAll" checked> <strong>All specialties</strong>
+          </label>
+          <div class="dropdown-divider"></div>
+          <% specialties.forEach(function(spec){ %>
+            <label class="dropdown-item mb-1">
+              <input type="checkbox" class="spec-option" value="<%= spec %>">
+              <span><%= spec %></span>
+            </label>
+          <% }) %>
+        </div>
+      </div>
+      <small id="specCountHint" style="opacity:.7; display:block; margin-top:.25rem;">All specialties selected</small>
     </div>
 
     <div class="col-6 col-md-2 d-flex align-items-center" style="margin-bottom:.5rem;">
@@ -126,7 +137,7 @@
   </div>
 </div>
 
-
+<!-- End -->
 <% const pcpOnly = controls && controls.PCPonly === true; %>
 
 <!-- <p>Please remember, all slots currently listed below fall under the category of Primary Care. More specialty slots will be available starting Wednesday, 10/20.</p><br/><br/> -->
@@ -157,82 +168,93 @@
   <!-- slot.physSpecialty.includes("Primary Care") -->
   <% if(true){%>
 
-<div class="row slot-row"
+<div class="slot-row"
      data-phys="<%= (slot.physName || '').toLowerCase() %>"
      data-spec="<%= (slot.physSpecialty || '').toLowerCase() %>"
      data-filled="<%= (slot.studentEmail && slot.studentEmail.length>0) ? 'true' : 'false' %>">
 
-      <div class="col col-12 col-lg-2">
-        <%= slot.physName %>, <%=slot.physSpecialty %>
-      </div>
-      <div class="col col-12 col-lg-2">
-        <%= slot.dDate %>
-      </div>
-      <div class="col col-12 col-lg-2">
-       <%= slot.timeStart %> to <%= slot.timeEnd %>
-      </div>
-      <div class="col col-12 col-lg-2">
-        <%= slot.location %>
-      </div>
-      <div class="col col-12 col-lg-2">
-        <%= slot.notes %>
-      </div>
-      <div class="col col-12 col-lg-2">
-        <% var btnProp = null; %>
-        <% count >= maxSlots ? btnProp = "disabled" : null %>
-
-        <% if (slot.studentEmail) { %>
-          <% if (slot.studentEmail.length>0) { %>
-          <p class="italics">Filled</p>
-          <% } %>
-        <% } else { %>
-          <% if (pcpOnly && !slot.isPCP) { %>
-          <!-- Show everything, but disable claiming during PCP only phase-->
-
-            <button class="btn" disabled title="PCP-only Phase">Match</button>
-            <small style="opacity:.7; margin-left:.5rem;">(PCP-only active)</small>
-          <% } else { %>
-          <!-- Normal claim form -->
-
-            <form class="" action="/claim" method="post">
-              <input type="hidden" name="userFName" value="<%=user.fName%>">
-              <input type="hidden" name="userLName" value="<%=user.lName%>">
-              <input type="hidden" name="userEmail" value="<%=user.email%>">
-              <input type="hidden" name="slotId" value="<%=slot._id%>">
-              <button type="submit" name="button" class="btn <%=btnProp%>" <%=btnProp%>>Match</button>
-            </form>
-          <% } %>
-        <% } %>
-      </div>
+  <div class="row">
+    <div class="col col-12 col-lg-2">
+      <%= slot.physName %>, <%=slot.physSpecialty %>
     </div>
+    <div class="col col-12 col-lg-2"><%= slot.dDate %></div>
+    <div class="col col-12 col-lg-2"><%= slot.timeStart %> to <%= slot.timeEnd %></div>
+    <div class="col col-12 col-lg-2"><%= slot.location %></div>
+    <div class="col col-12 col-lg-2"><%= slot.notes %></div>
+    <div class="col col-12 col-lg-2">
+      <% var btnProp = null; %>
+      <% count >= maxSlots ? btnProp = "disabled" : null %>
 
-<hr />
+      <% if (slot.studentEmail && slot.studentEmail.length>0) { %>
+        <p class="italics">Filled</p>
+      <% } else { %>
+        <% if (pcpOnly && !slot.isPCP) { %>
+          <button class="btn" disabled title="PCP-only Phase">Match</button>
+          <small style="opacity:.7; margin-left:.5rem;">(PCP-only active)</small>
+        <% } else { %>
+          <form action="/claim" method="post">
+            <input type="hidden" name="userFName" value="<%=user.fName%>">
+            <input type="hidden" name="userLName" value="<%=user.lName%>">
+            <input type="hidden" name="userEmail" value="<%=user.email%>">
+            <input type="hidden" name="slotId" value="<%=slot._id%>">
+            <button type="submit" name="button" class="btn <%=btnProp%>" <%=btnProp%>>Match</button>
+          </form>
+        <% } %>
+      <% } %>
+    </div>
+  </div>
+
+  <hr />
+</div>
+
+
 <% }}) %>
 <%  } %>
 </div>
 
 
 <!-- filter logic -->
-
 <script>
 (function(){
   const q  = s => document.querySelector(s);
   const qa = s => Array.from(document.querySelectorAll(s));
 
+  // inputs
   const search     = q('#slotSearch');
-  const specSel    = q('#specFilter');
   const unclaimed  = q('#onlyUnclaimed');
   const resetBtn   = q('#resetFilters');
-  const rows       = qa('.slot-row');
 
-  function selectedSpecs() {
-    return Array.from(specSel.selectedOptions).map(o => (o.value || '').toLowerCase());
+  // specialty dropdown
+  const specAll    = q('#specAll');
+  const specChecks = qa('.spec-option');
+  const specHint   = q('#specCountHint');
+
+  // rows
+  const rows = qa('.slot-row');
+
+  // keep dropdown open when clicking inside
+  document.querySelectorAll('.dropdown-menu').forEach(menu => {
+    menu.addEventListener('click', e => e.stopPropagation());
+  });
+
+  function selectedSpecsLower() {
+    const picked = specChecks.filter(c => c.checked).map(c => (c.value || '').toLowerCase());
+    return picked;
+  }
+
+  function updateSpecHint() {
+    const picked = specChecks.filter(c => c.checked).length;
+    if (specAll.checked || picked === 0 || picked === specChecks.length) {
+      specHint.textContent = 'All specialties selected';
+    } else {
+      specHint.textContent = picked + ' specialty(ies) selected';
+    }
   }
 
   function applyFilters() {
     const term = (search?.value || '').trim().toLowerCase();
-    const specs = selectedSpecs(); // array of lowercased specialties
     const wantOnlyUnclaimed = !!(unclaimed && unclaimed.checked);
+    const pickedSpecs = specAll && specAll.checked ? [] : selectedSpecsLower(); // empty => all
 
     rows.forEach(row => {
       const name = row.dataset.phys || '';
@@ -241,12 +263,17 @@
 
       let ok = true;
 
+      // text search
       if (term) {
         ok = name.includes(term) || spec.includes(term);
       }
-      if (ok && specs.length > 0) {
-        ok = specs.includes(spec);
+
+      // specialties (if any picked)
+      if (ok && pickedSpecs.length > 0) {
+        ok = pickedSpecs.includes(spec);
       }
+
+      // only unclaimed
       if (ok && wantOnlyUnclaimed) {
         ok = !isFilled;
       }
@@ -255,20 +282,49 @@
     });
   }
 
-  function resetFilters() {
-    if (search) search.value = '';
-    if (specSel) Array.from(specSel.options).forEach(o => o.selected = false);
-    if (unclaimed) unclaimed.checked = false;
-    applyFilters();
-  }
-
+  // wire up events
   search?.addEventListener('input', applyFilters);
-  specSel?.addEventListener('change', applyFilters);
   unclaimed?.addEventListener('change', applyFilters);
-  resetBtn?.addEventListener('click', resetFilters);
 
+  // spec "All" checkbox behavior
+  specAll?.addEventListener('change', () => {
+    if (specAll.checked) {
+      specChecks.forEach(c => c.checked = false);
+    }
+    updateSpecHint();
+    applyFilters();
+  });
+
+  // individual spec checkboxes
+  specChecks.forEach(c => {
+    c.addEventListener('change', () => {
+      if (specChecks.some(x => x.checked)) {
+        specAll.checked = false;
+      } else {
+        specAll.checked = true;
+      }
+      updateSpecHint();
+      applyFilters();
+    });
+  });
+
+  // reset button
+  resetBtn?.addEventListener('click', () => {
+    if (search) search.value = '';
+    if (unclaimed) unclaimed.checked = false;
+    if (specAll) specAll.checked = true;
+    specChecks.forEach(c => c.checked = false);
+    updateSpecHint();
+    applyFilters();
+  });
+
+  // initial render
+  updateSpecHint();
   applyFilters();
 })();
 </script>
+<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
 
 <%- include("./partials/footer"); -%>
