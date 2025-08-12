@@ -1,7 +1,12 @@
 <%- include("./partials/header"); -%>
 
 <style>
-  .page-hero { display:flex; align-items:center; gap:14px; margin:18px 0 8px; }
+  .page-hero { 
+    display:flex; align-items:center; gap:14px; 
+    margin:18px 0 20px; 
+    padding-bottom:16px; 
+    border-bottom:1px solid #e5e7eb;
+  }
   .avatar { width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#eef4ff;color:#3353d1;font-weight:700; }
   .badge-soft { background:#dbeafe; color:#1e3a8a; border-radius:999px; padding:4px 12px; font-size:14px; font-weight:600; display:inline-block; }
   .pill-nonpcp { display:inline-block; padding:2px 10px; border-radius:999px; font-size:12px; background:#fef3c7; color:#92400e; }
@@ -19,7 +24,7 @@
   .alert-warning { background:#fff7ed; color:#9a3412; }
   .alert .close { position:absolute; right:10px; top:8px; background:transparent; border:0; font-size:20px; line-height:1; color:inherit; opacity:.6; }
 
-  /* Locked banner (separate + not closable) */
+  /* Locked banner (permanent) */
   .lock-banner-wrap { margin:18px 0; }
   .lock-banner { border-radius:16px; padding:14px 16px; background:#fff7ed; color:#9a3412; border:1px solid #fcd49b; }
 
@@ -40,7 +45,7 @@
 
 <div class="container">
 
-  <% /* --- NON-CLOSABLE MATCH-LOCKED BANNER (separate) --- */ %>
+  <% /* --- MATCH LOCKED BANNER (permanent) --- */ %>
   <% if (controls && controls.matchingLocked) { %>
     <div class="lock-banner-wrap">
       <div class="lock-banner">
@@ -50,7 +55,7 @@
     </div>
   <% } %>
 
-  <% /* Other alerts remain closable */ %>
+  <% /* Other alerts (closable) */ %>
   <% if (errM && errM.length) { %>
     <div class="alert alert-info">
       <%= errM %>
@@ -59,7 +64,7 @@
   <% } %>
   <% if (controls && controls.PCPonly) { %>
     <div class="alert alert-info">
-      PCP‑only mode is ON. You can only claim primary‑care slots right now.
+      PCP-only mode is ON. You can only claim primary-care slots right now.
       <button type="button" class="close" aria-label="Close">&times;</button>
     </div>
   <% } %>
@@ -101,7 +106,7 @@
       <div class="head">
         <strong><%= slot.physName || '—' %></strong>
         <% if (slot.physSpecialty) { %><span class="badge-soft"><%= slot.physSpecialty %></span><% } %>
-        <% if (PCPonly && slot.physSpecialty && !isPCP) { %><span class="pill-nonpcp">Non‑PCP</span><% } %>
+        <% if (PCPonly && slot.physSpecialty && !isPCP) { %><span class="pill-nonpcp">Non-PCP</span><% } %>
       </div>
       <div class="muted" style="margin:6px 0;">
         <strong><%= slot.dDate || '-' %></strong> • <%= (slot.timeStart || '-') %> to <%= (slot.timeEnd || '-') %> • <%= slot.location || '-' %>
@@ -120,7 +125,7 @@
     </div>
   <% }); %>
 
-  <% /* --- Move the CONFIRMED message here, under the list --- */ %>
+  <% /* --- CONFIRMED MESSAGE under matches (permanent, no close) --- */ %>
   <% if (confirmed) { %>
     <div class="alert alert-success" style="margin-top:10px;">
       You have confirmed your slots.
@@ -156,7 +161,7 @@
         <!-- Multi-select dropdown -->
         <div class="dropdown">
           <button class="dropdown-toggle" type="button" id="specDropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-            Specialties (multi‑select)
+            Specialties (multi-select)
           </button>
           <div class="dropdown-menu p-2" aria-labelledby="specDropdown">
             <label class="dropdown-item">
@@ -182,7 +187,7 @@
     <div id="slotList">
       <% (slots || []).forEach(function(slot){
            const isPCP2 = ['Family Medicine (PCP)','Primary Care'].includes((slot.physSpecialty||'').trim());
-           const claimDisabledReason = (controls && controls.PCPonly && !isPCP2) ? "PCP‑only is active." : null;
+           const claimDisabledReason = (controls && controls.PCPonly && !isPCP2) ? "PCP-only is active." : null;
            const claimedState = slot.studentEmail ? (slot.studentEmail === user.email ? "me" : "other") : "no";
       %>
         <div class="slot-card searchable"
@@ -192,7 +197,7 @@
           <div class="head">
             <strong><%= slot.physName || '—' %></strong>
             <% if (slot.physSpecialty) { %><span class="badge-soft"><%= slot.physSpecialty %></span><% } %>
-            <% if ((controls && controls.PCPonly) && slot.physSpecialty && !isPCP2) { %><span class="pill-nonpcp">Non‑PCP</span><% } %>
+            <% if ((controls && controls.PCPonly) && slot.physSpecialty && !isPCP2) { %><span class="pill-nonpcp">Non-PCP</span><% } %>
           </div>
 
           <div class="muted" style="margin:6px 0;">
@@ -236,28 +241,20 @@
 </div>
 
 <script>
-  // Dismiss closable alerts
   document.querySelectorAll('.alert .close').forEach(btn => {
     btn.addEventListener('click', () => btn.closest('.alert')?.remove());
   });
-
   (function(){
     const q = document.getElementById('search');
     const onlyOpen = document.getElementById('onlyOpen');
     const cards = Array.from(document.querySelectorAll('#slotList .slot-card'));
-
-    // keep dropdown open when clicking inside
     document.querySelectorAll('.dropdown-menu').forEach(menu => {
       menu.addEventListener('click', e => e.stopPropagation());
     });
-
     const specAll = document.getElementById('specAll');
     const specChecks = Array.from(document.querySelectorAll('.spec-option'));
     const specHint = document.getElementById('specHint');
-
-    function selectedSpecs(){
-      return specChecks.filter(c => c.checked).map(c => c.value);
-    }
+    function selectedSpecs(){ return specChecks.filter(c => c.checked).map(c => c.value); }
     function updateSpecHint(){
       const picked = specChecks.filter(c => c.checked).length;
       if (specAll.checked || picked === 0 || picked === specChecks.length) {
@@ -269,20 +266,15 @@
     function matches(card){
       const query = (q?.value || '').toLowerCase().trim();
       if (query && !(card.dataset.search || '').includes(query)) return false;
-
       const chosen = specAll?.checked ? [] : selectedSpecs();
       if (chosen.length && !chosen.includes(card.dataset.spec || '')) return false;
-
       const claimed = card.getAttribute('data-claimed');
       if (onlyOpen && onlyOpen.checked && claimed !== 'no') return false;
-
       return true;
     }
     function apply(){ cards.forEach(c => { c.style.display = matches(c) ? '' : 'none'; }); }
-
     q?.addEventListener('input', apply);
     onlyOpen?.addEventListener('change', apply);
-
     specAll?.addEventListener('change', () => {
       if (specAll.checked) specChecks.forEach(c => c.checked = false);
       updateSpecHint(); apply();
@@ -291,13 +283,10 @@
       specAll.checked = !specChecks.some(x => x.checked);
       updateSpecHint(); apply();
     }));
-
-    updateSpecHint();
-    apply();
+    updateSpecHint(); apply();
   })();
 </script>
 
-<!-- Bootstrap (optional, used for dropdown styles if you rely on BS elsewhere) -->
 <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
 <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
