@@ -742,6 +742,35 @@ if(port == null || port == ""){
   port=3000;
 }
 
+app.post("/confirm", function(req, res) {
+  const userEmail = _.toLower(req.body.userEmail);
+
+  Confirm.updateOne(
+    { email: userEmail },
+    { $set: { confirmed: true } },
+    { upsert: true },
+    function(err) {
+      if (err) return errorPage(res, err);
+
+      Student.findOne({ email: userEmail }, function(err, foundUser) {
+        if (err) return errorPage(res, err);
+
+        Slot.find(function(err, slots) {
+          if (err) return errorPage(res, err);
+          const array = setDisplayValues(slots);
+          res.render("home", {
+            user: foundUser,
+            slots: array,
+            controls: res.locals.controls,
+            maxSlots: (res.locals.controls && res.locals.controls.maxSlots) || maxSlots,
+            errM: "Successfully confirmed your slots."
+          });
+        });
+      });
+    }
+  );
+});
+
 app.listen(port, function() {
   console.log("Server started!");
 });
