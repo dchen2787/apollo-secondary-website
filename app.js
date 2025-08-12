@@ -1,28 +1,30 @@
+// app.js
 const express = require('express');
 const ejs = require('ejs');
 const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
 const _ = require('lodash');
 const bcrypt = require('bcrypt');
+
 const saltRounds = 10;
-const months = ["January","February","March","April","May","June","July","August","September","October","November","December",]
+const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 
 const app = express();
 app.use(express.static('public'));
 app.set('view engine', 'ejs');
 app.use(bodyParser.urlencoded({extended:true}));
 
-mongoose.connect("mongodb+srv://admin:SkSBcB1qnCkR2cIH@cluster0-bw7ds.mongodb.net/googlesheetsdb", {useNewUrlParser: true, useUnifiedTopology: true });
+// ---- DB ----
+mongoose.connect(
+  "mongodb+srv://admin:SkSBcB1qnCkR2cIH@cluster0-bw7ds.mongodb.net/googlesheetsdb",
+  { useNewUrlParser: true, useUnifiedTopology: true }
+);
 
+// ---- Schemas / Models ----
 const adminSchema = new mongoose.Schema({
-  fName:String,
-  lName:String,
-  password:String,
-  email:String,
-  permissions:Array
+  fName:String, lName:String, password:String, email:String, permissions:Array
 });
 const Admin = mongoose.model("Admin", adminSchema);
-
 
 const slotSchema = new mongoose.Schema({
   physName: String,
@@ -40,48 +42,73 @@ const slotSchema = new mongoose.Schema({
   filled: Boolean
 });
 const Slot = mongoose.model("Slot", slotSchema);
-// const newSlot = new Slot ({
-//   physName:"working"
-// });
-// newSlot.save();
 
 const studentSchema = new mongoose.Schema({
-  fName:String,
-  lName:String,
-  password:String,
-  email:String,
-  appId:String,
-  group:String,
-  matchingLocked: Boolean,
+  fName:String, lName:String, password:String, email:String, appId:String,
+  group:String, matchingLocked: Boolean,
 });
 const Student = mongoose.model("Student", studentSchema);
 
 const confirmSchema = new mongoose.Schema({
   email: String,
   confirmed: Boolean
-})
+});
 const Confirm = mongoose.model("Confirm", confirmSchema);
 
 const controlSchema = new mongoose.Schema({
   maxSlots: Number,
   PCPonly: Boolean,
   matchingLocked: { type: Boolean, default: false },
-  id: Number, //future: add groups allowed
-})
+  id: Number, // future: groups allowed
+});
 const Control = mongoose.model("Control", controlSchema);
 
+const logSchema = new mongoose.Schema({
+  time:String, type:String, user:String, update:String, slot: String
+});
+const Log = mongoose.model("Log", logSchema);
 
-// ---- PCP helpers ----
-// adjust to match your exact physSpecialty strings
+// ---- Helpers ----
 const ALLOWED_PCP = new Set([
   "Family Medicine (PCP)",
-  "Primary Care"
+  "Primary Care",
 ]);
-
 function isPCPSlot(slot) {
   return ALLOWED_PCP.has((slot.physSpecialty || "").trim());
 }
 
+function makeLog(type, user, update, slotId){
+  const date = new Date();
+  if (!slotId || slotId === " ") return;
+  Slot.findOne({_id:slotId}, function(err, foundSlot){
+    if (err || !foundSlot) return;
+    const newLog = new Log ({
+      time: (1+date.getMonth())+"/"+date.getDate()+" "+date.getHours()+":"+date.getMinutes()+":"+date.getSeconds(),
+      type, user, update, // activated email or slotid
+      slot: `${foundSlot.physName} ${foundSlot.timeStart} ${foundSlot.date}`
+    });
+    newLog.save(()=>{});
+  });
+}
+
+function setDisplayValues(slots){
+  const sortedSlots = (slots || []).sort((a, b) => (a.date || 0) - (b.date || 0));
+  return sortedSlots.map(s => {
+    const x = {...s};
+    if (x.date) {
+      const dt = new Date(x.date);
+      x.dDate = `${months[dt.getMonth()]} ${dt.getDate()}, ${dt.getFullYear()}`;
+    }
+    x.isPCP = isPCPSlot(x);
+    return x;
+  });
+}
+
+function errorPage(res, err) {
+  return res.render("error", { errM: err?.message || String(err) });
+}
+
+// load controls into res.locals if needed elsewhere
 app.use(async (req, res, next) => {
   try {
     res.locals.controls = await Control.findOne({ id: 1 }).lean();
@@ -92,676 +119,193 @@ app.use(async (req, res, next) => {
   next();
 });
 
-// thisControl.save(function(err){
-//   if(!err){
-//     console.log("Saved control")
-//   }});
-
-// toggle match access
-// Student.updateMany({}, {matchingLocked:true}, function(err, students){
-//   if(err){
-//     console.log(err);
-//   } else { 
-//     console.log("all students (un)locked");
-//   }
-// });
-
-// Student.updateMany({group:"2022-2024 "}, {matchingLocked:false}, function(err, students){
-//   if(err){
-//     console.log(err);
-//   } else { 
-//     console.log("all students locked");
-//   }
-// });
-
-//temp, integrate with upload student accounts
-function initConfirm(){
-  Student.find(function(err, students){
-    if(err){
-      console.log(err);
-    } else {
-      students.forEach(function(thisStudent){
-        const newConfirm = new Confirm ({
-          email: thisStudent.email,
-          confirm: false
-        });
-        newConfirm.save(function(err){
-          if(err){
-            console.log(err);
-            errorPage(res, err);
-          } else {
-            console.log("Confirm saved for "+thisStudent.email);
-          }
-        });
-        
-      });
-    }
-
-  });
-}
-// initConfirm();
-
-const logSchema = new mongoose.Schema({
-  time:String,
-  type:String,
-  user:String,
-  update:String,
-  slot: String
-});
-const Log = mongoose.model("Log", logSchema);
-
-function makeLog(type, user, update, slot){
-  var date = new Date();
-  if (slot != " "){
-    Slot.findOne({_id:slot}, function(err, foundSlot){
-      if (err){
-        console.log(err);
-      } else {
-        const newLog = new Log ({
-          time: (1+date.getMonth())+"/"+date.getDate()+" "+date.getHours()+":"+date.getMinutes()+":"+date.getSeconds(),
-          type: type,
-          user: user,
-          update: update, // activated email or slotid
-          slot: foundSlot.physName + " "+ foundSlot.timeStart+ " "+foundSlot.date
-        });
-        newLog.save(function(err){
-          if(err){
-            console.log(err);
-            errorPage(res, err);
-          } else {
-            console.log("Log saved");
-          }
-        });
-      }
-    });
-  }
-  
-}
-
-//INIT code
-var maxSlots = 100;
-var allGroups = [];
-// var allowedGroups =[];
-
-updateGroups();
-
-function setDisplayValues(slots){
-  const xArray = [];
-  const sortedSlots = slots.sort((a, b) => a.date - b.date)
-
-  sortedSlots.forEach(function(slot){
-    const x = slot;
-    if(x.date){
-      const xMonth = months[x.date.getMonth()];
-      const xDay = x.date.getDate();
-      const xYear = x.date.getFullYear();
-      x.dDate = xMonth.concat(' ',xDay,', ', xYear);
-    }
-    // if(x.timeStart && x.timeEnd){
-    //   var xTimeStart = x.timeStart.getHours()-3; xTimeStart>12 ? xTimeStart=(xTimeStart-12).toString() : xTimeStart=xTimeStart.toString()
-    //   var xTimeEnd = x.timeEnd.getHours()-3; xTimeEnd>12 ? xTimeEnd=(xTimeEnd-12).toString() : xTimeEnd=xTimeEnd.toString()
-    //   var xTimeSM = x.timeStart.getMinutes().toString(); xTimeSM == "0" ? xTimeSM = "00" : null
-    //   var xTimeEM = x.timeEnd.getMinutes().toString(); xTimeEM == "0" ? xTimeEM = "00" : null
-    //   var ind1 = ''; var ind2 ='';
-    //   x.timeStart.getHours()>12 ? ind1 = "pm" : ind1 = "am"
-    //   x.timeEnd.getHours()>12 ? ind2 = "pm" : ind2 = "am"
-
-    //   x.dTime = xTimeStart.concat(':',xTimeSM,ind1,' to ', xTimeEnd,':',xTimeEM,ind2);
-    // }
-    // console.log(x.timeStart);
-    x.isPCP = isPCPSlot(x);   // <-- NEW: tag each slot
-    xArray.push(x);
-  });
-    // console.log(xArray);
-  return xArray;
-};
-
-//FUNCTIONS
+let maxSlots = 100;
+let allGroups = [];
 function updateGroups(){
   Student.find(function(err, students){
-    if(err){
-      console.log(err);
-    } else {
-      var studentGroups = [];
-      students.forEach(function(student){
-        let duplicate = false;
-        let thisStudent = student;
-        for (let i = 0; i<allGroups.length; i++){
-          if (thisStudent.group == allGroups[i][0]){
-            duplicate = true;
-            break;
-          }
-        }
-        if (duplicate == false){
-          allGroups.push([student.group, false]);
-        }
-      });
-
-      // Removes duplicate group names
-      // for(let i = 0; i<studentGroups.length; i++){
-      //   for(let j = i+1; j<a.length; j++) {
-      //     if(a[j] == a[i]){
-      //       a.splice(j,1);
-      //     }
-      //   }
-      // }
-    }
-    // allGroups = a;
-    // for (let i = 0; i<allGroups.length; i++){
-    //   allGroups[i][1] = false;
-    // }
+    if (err) return;
+    const seen = new Set(allGroups.map(g => g[0]));
+    students.forEach(st => {
+      if (!seen.has(st.group)) {
+        allGroups.push([st.group, false]);
+        seen.add(st.group);
+      }
+    });
   });
 }
+updateGroups();
 
-// function setMatchingLocked(student){
-//   for(let i = 0; i<allGroups.length; i++){
-//     if(allGroups[i][0] == student.group){
-//       var matchingLocked = allGroups[i][1];
-//       // console.log(allGroups[i]);
-//       break;
-//     }
-//   }
-//   return false; //temporary: if true, matches are allowed. set to false after the session
-//   return matchingLocked;
-// }
-function checkPCP(array){
-  // array.forEach(function(thisSlot){
-  //   console.log(thisSlot);
-  // })
-  console.log("checking")
-  // console.log(array);
-}
+// Single place to render "home" with correct confirmed flag
+async function renderHome(res, userEmail, errM = "") {
+  try {
+    const [foundUser, slotsRaw, ctrl, confirmDoc] = await Promise.all([
+      userEmail ? Student.findOne({ email: userEmail }).lean() : null,
+      Slot.find({}).lean(),
+      Control.findOne({ id: 1 }).lean(),
+      userEmail ? Confirm.findOne({ email: userEmail }).lean() : null
+    ]);
 
+    const slots = setDisplayValues(slotsRaw || []);
+    const confirmed = !!(confirmDoc && confirmDoc.confirmed);
 
-function errorPage(res, err) {
-  return res.render("error", { errM: err });
-}
-
-//GET
-app.get("/", function(req, res) {
-    // Example flow:
-    Student.findOne({ email: req.user.email }, function(err, foundUser) {
-        if (err) { console.log(err); return; }
-
-        Slot.find({}, function(err, array) {
-            if (err) { console.log(err); return; }
-
-            Control.findOne({}, function(err, ctrl) {
-                if (err) { console.log(err); return; }
-
-                res.render("home", {
-                    user: foundUser,
-                    slots: array,
-                    controls: ctrl,
-                    maxSlots: (ctrl && ctrl.maxSlots) || maxSlots,
-                    errM: "",
-                    confirmed: false // default — you can replace with real value if you store it
-                });
-            });
-        });
+    res.render("home", {
+      user: foundUser,
+      slots,
+      controls: ctrl,
+      maxSlots: (ctrl && ctrl.maxSlots) || maxSlots,
+      errM,
+      confirmed
     });
+  } catch (e) {
+    console.error(e);
+    return errorPage(res, e);
+  }
+}
+
+// ---- Routes ----
+// GET
+app.get("/", function(req,res){
+  res.render("landing");
 });
 app.get("/admin-login", function(req,res){
   res.render("admin-login", {errM:""});
-})
+});
 app.get("/login", function(req,res){
   res.render("login", {errM:"", errM2:""});
 });
 app.get("/activate-account", function(req,res){
   res.render("activate-account", {errM:"", errM2:""});
 });
-// app.get("/error", function(req,res){
-//   res.render("error", {err:"hi"});
-// });
 app.get('*', function(req, res) {
   res.redirect('/');
 });
 
-//POST
+// POST
+// Activate account
 app.post("/activate-account", function(req,res){
   const email = _.toLower(req.body.email);
   const password = req.body.password;
-  const fName = req.body.fName;
-  const lName = req.body.lName;
-  console.log(email);
 
-  Student.findOne({email:email}, function(err, foundUser){
-    if(err){
-      console.log(err);
-      res.render("activate-account", {errM:"An error occured. Please try again or contact apolloyimde@gmail.com."})
-    } else { //no error
-      if (foundUser){
-        if(foundUser.fName){
-          res.render("activate-account", {errM:"An account with this email has already been activated. Please use the login page or contact apolloyimde@gmail.com."})
-        }else{
-          bcrypt.compare(password,foundUser.password, function(err, result){
-            if(err){
-              console.log(err);
-              res.render("activate-account", {errM:"An error occured. Please try again or contact apolloyimde@gmail.com."})
-            } else {
-              if(result){ //SUCCESS
-                Student.updateOne({email:email}, {fName:_.startCase(req.body.fName), lName:_.startCase(req.body.lName)}, function(err){
-                  if(err){
-                    console.log(err);
-                    res.render("activate-account", {errM:"An error occured. Please try again or contact apolloyimde@gmail.com."})
-                  } else {
-                    Slot.find(function(err,slots){
-                      if(err){
-                        console.log(err);
-                        errorPage(res, err);
-                      } else {
-                        console.log("SUCCESS");
-                        const array = setDisplayValues(slots);
-                        makeLog("Activate account", email, email, " ");
+  Student.findOne({email}, function(err, foundUser){
+    if(err) return res.render("activate-account", {errM:"An error occured. Please try again or contact apolloyimde@gmail.com."});
+    if (!foundUser) return res.render("activate-account", {errM:"Email not found. Please use the login information sent to you or contact apolloyimde@gmail.com."});
+    if (foundUser.fName) return res.render("activate-account", {errM:"An account with this email has already been activated. Please use the login page or contact apolloyimde@gmail.com."});
 
-                        res.render("home", {errM:"Account activated!",user:foundUser, slots:array, maxSlots: (res.locals.controls && res.locals.controls.maxSlots) || maxSlots, controls: res.locals.controls});
-                      }
-                    });
-                  }
-                });
-              } else { //wrong password
-                res.render("activate-account", {errM: "Incorrect password. Please use the login information sent to you or contact apolloyimde@gmail.com."})
-              }
-            }
-          });
+    bcrypt.compare(password,foundUser.password, function(err, ok){
+      if(err || !ok) return res.render("activate-account", {errM:"Incorrect password. Please use the login information sent to you or contact apolloyimde@gmail.com."});
+
+      Student.updateOne(
+        {email},
+        {fName:_.startCase(req.body.fName), lName:_.startCase(req.body.lName)},
+        async function(err){
+          if(err) return res.render("activate-account", {errM:"An error occured. Please try again or contact apolloyimde@gmail.com."});
+          return renderHome(res, email, "Account activated!");
         }
-      } else {
-        res.render("activate-account", {errM:"Email not found. Please use the login information sent to you or contact apolloyimde@gmail.com."})
-      }
-    }
-  })
-});
-
-app.post("/login", function(req,res){ //STUDENT LOGIN
-  const email = _.toLower(req.body.email);
-  const password = req.body.password;
-
-  Student.findOne({email:email}, function(err, foundUser){
-    if(err){
-      res.render("login", {errM:"", errM2:"An error occured. Please try again."});
-    } else {
-      if(!foundUser){ //no user has that email
-        res.render("login", {errM:"", errM2:"Username or password was incorrect."});
-      } else { //found a user with that email
-        if(foundUser.fName){
-        bcrypt.compare(password, foundUser.password, function(err, result){
-          if(err){
-            res.render("login", {errM:"", errM2:"An error occured. Please try again.!"});
-          } else {
-            if(result){
-              Slot.find(function(err,slots){
-                if(err){
-                  console.log(err);
-                  errorPage(res, err);
-                } else {
-                  // let matchingLocked = setMatchingLocked(foundUser);
-                  const array = setDisplayValues(slots);
-                  Control.findOne({id:1}, function(err, controls){
-                    res.render("home", {user:foundUser, slots:array, maxSlots:(res.locals.controls && res.locals.controls.maxSlots) || maxSlots, errM:"", controls:controls});
-                  });
-                }
-              });
-            } else {
-              res.render("login", {errM:"", errM2:"Username or password was incorrect."});
-            }
-          }
-        });
-      } else {
-        res.render("login", {errM:"", errM2:"Account not activated. Please activate your account (https://the-match-apolloyim-2f158c0ae122.herokuapp.com/activate-account) or contact apolloyimde@gmail.com."});
-      }
-      }
-    }
+      );
+    });
   });
 });
 
+// Student login
+app.post("/login", function(req,res){
+  const email = _.toLower(req.body.email);
+  const password = req.body.password;
+
+  Student.findOne({email}, function(err, foundUser){
+    if(err) return res.render("login", {errM:"", errM2:"An error occured. Please try again."});
+    if(!foundUser) return res.render("login", {errM:"", errM2:"Username or password was incorrect."});
+    if(!foundUser.fName) {
+      return res.render("login", {errM:"", errM2:"Account not activated. Please activate your account (https://the-match-apolloyim-2f158c0ae122.herokuapp.com/activate-account) or contact apolloyimde@gmail.com."});
+    }
+
+    bcrypt.compare(password, foundUser.password, function(err, ok){
+      if(err || !ok) return res.render("login", {errM:"", errM2:"Username or password was incorrect."});
+      return renderHome(res, foundUser.email, "");
+    });
+  });
+});
+
+// Admin login
 app.post("/admin-login", function(req,res){
   const email = _.toLower(req.body.email);
   const password = req.body.password;
 
-  Admin.findOne({email:email}, function(err, foundAdmin){
-    if(err){
-      res.render("admin-login",{errM:"An error occured. Please try again."});
-    } else {
-      if(foundAdmin){
-        bcrypt.compare(password, foundAdmin.password, function(err,result){
-          if(err){
-            res.render("admin-login",{errM:"An error occured. Please try again."});
-          } else {
-            if(result){ //success!
-              Slot.find(function(err,slots){
-                if(err){
-                  console.log(err);
-                  errorPage(res, err);
-                } else {
-                  updateGroups();
-                  const array = setDisplayValues(slots);
-                  Confirm.find(function(err,confirms){
-                    if(err){
-                      console.log(err);
-                      errorPage(res, err);
-                    } else {
-                    res.render("admin-home", {
-                      slots: array,
-                      maxSlots: (res.locals.controls && res.locals.controls.maxSlots) || maxSlots,
-                      allGroups: allGroups.sort(),
-                      confirms: confirms
-                    });
-                    }
-                  });
-                }
-              });
-            } else {
-              res.render("admin-login",{errM:"Incorrect password."});
-            }
-          }
+  Admin.findOne({email}, function(err, foundAdmin){
+    if(err) return res.render("admin-login",{errM:"An error occured. Please try again."});
+    if(!foundAdmin) return res.render("admin-login",{errM:"Email not found."});
+
+    bcrypt.compare(password, foundAdmin.password, function(err, ok){
+      if(err || !ok) return res.render("admin-login",{errM:"Incorrect password."});
+
+      Slot.find(function(err,slots){
+        if(err) return errorPage(res, err);
+        updateGroups();
+        const array = setDisplayValues(slots);
+        Confirm.find(function(err,confirms){
+          if(err) return errorPage(res, err);
+          res.render("admin-home", {
+            slots: array,
+            maxSlots: (res.locals.controls && res.locals.controls.maxSlots) || maxSlots,
+            allGroups: allGroups.sort(),
+            confirms: confirms
+          });
         });
-      } else {
-        res.render("admin-login",{errM:"Email not found."});
-      }
-    }
+      });
+    });
   });
 });
 
+// Claim slot (blocked if matchingLocked)
 app.post("/claim", function(req,res){
   const userFName = req.body.userFName;
   const userLName = req.body.userLName;
-  const userName  = userFName.concat(" ",userLName);
+  const userName  = `${userFName} ${userLName}`;
   const userEmail = _.toLower(req.body.userEmail);
   const slotId    = req.body.slotId;
 
   Control.findOne({ id: 1 }).lean().exec(function(err, ctrl) {
-    if (err) { console.log(err); return errorPage(res, err); }
+    if (err) return errorPage(res, err);
 
-    // A) global lock guard
     if (ctrl && ctrl.matchingLocked === true) {
-      return Student.findOne({ email: userEmail }, function(err, foundUser) {
-        if (err) { console.log(err); return errorPage(res, err); }
-        Slot.find(function(err, slots){
-          if (err) { console.log(err); return errorPage(res, err); }
-          const array = setDisplayValues(slots);
-          return res.render("home", {
-            user: foundUser,
-            slots: array,
-            controls: ctrl,
-            maxSlots: (ctrl && ctrl.maxSlots) || maxSlots,
-            errM: "Matching is currently locked. You can review your matches but cannot add new ones."
-          });
-        });
-      });
+      return renderHome(res, userEmail, "Matching is currently locked. You can review/remove your matches but cannot add new ones.");
     }
 
-    // B) load slot, then PCP-only guard + filled guard
     Slot.findOne({_id:slotId}, function(err,thisSlot){
-      if(err){ console.log(err); return errorPage(res, err); }
-      if (!thisSlot) { 
-        console.log("Slot not found:", slotId);
-        return errorPage(res, "Slot not found.");
-      }
+      if(err || !thisSlot) return errorPage(res, err || "Slot not found.");
 
-      // PCP-only guard (server-side)
+      // PCP-only guard
       if (ctrl && ctrl.PCPonly === true && !isPCPSlot(thisSlot)) {
-        return Student.findOne({ email: userEmail }, function(err, foundUser) {
-          if (err) { console.log(err); return errorPage(res, err); }
-          Slot.find(function(err, slots){
-            if (err) { console.log(err); return errorPage(res, err); }
-            const array = setDisplayValues(slots);
-            return res.render("home", {
-              user: foundUser,
-              slots: array,
-              controls: ctrl,
-              maxSlots: (ctrl && ctrl.maxSlots) || maxSlots,
-              errM: "PCP-only is active. You can only claim primary‑care slots right now."
-            });
-          });
-        });
+        return renderHome(res, userEmail, "PCP-only is active. You can only claim primary‑care slots right now.");
       }
 
       // Already filled?
       if (thisSlot.studentEmail && thisSlot.studentEmail.length > 0) {
-        return Student.findOne({email:userEmail},function(err,foundUser){
-          if(err){ console.log(err); return errorPage(res, err); }
-          Slot.find(function(err,slots){
-            if(err){ console.log(err); return errorPage(res, err); }
-            const array = setDisplayValues(slots);
-            return res.render("home", {
-              user: foundUser,
-              slots: array,
-              controls: ctrl,
-              maxSlots: (ctrl && ctrl.maxSlots) || maxSlots,
-              errM: "This slot was already claimed. Please reload the page to see the latest availability."
-            });
-          });
-        });
+        return renderHome(res, userEmail, "This slot was already claimed. Please reload to see the latest availability.");
       }
 
-      // C) claim it
+      // Claim
       Slot.updateOne({_id:slotId},{studentName:userName, studentEmail:userEmail}, function(err){
-        if(err){ console.log(err); return errorPage(res, err); }
-        Student.findOne({email:userEmail},function(err,foundUser){
-          if(err){ console.log(err); return errorPage(res, err); }
-          Slot.find(function(err,slots){
-            if(err){ console.log(err); return errorPage(res, err); }
-            const array = setDisplayValues(slots);
-            makeLog("Claim slot", userEmail, slotId, slotId);
-            return res.render("home", {
-              user:foundUser,
-              slots:array,
-              controls: ctrl,
-              maxSlots: (ctrl && ctrl.maxSlots) || maxSlots,
-              errM:"Successfully matched."
-            });
-          });
-        });
+        if(err) return errorPage(res, err);
+        makeLog("Claim slot", userEmail, slotId, slotId);
+        return renderHome(res, userEmail, "Successfully matched.");
       });
     });
   });
 });
 
+// Unclaim slot (ALLOWED even when locked)
 app.post("/unclaim", function(req,res){
   const slotId = req.body.slotId;
   const userEmail = _.toLower(req.body.userEmail);
 
-  // deny if globally locked
-  Control.findOne({ id: 1 }).lean().exec(function(err, ctrl) {
-    if (err) { console.log(err); return errorPage(res, err); }
-    if (ctrl && ctrl.matchingLocked === true) {
-      return Student.findOne({email:userEmail}, function(err, foundUser){
-        if (err) { console.log(err); return errorPage(res, err); }
-        Slot.find(function(err, slots){
-          if (err) { console.log(err); return errorPage(res, err); }
-          const array = setDisplayValues(slots);
-          return res.render("home", {
-            user: foundUser,
-            slots: array,
-            controls: ctrl,
-            maxSlots: (ctrl && ctrl.maxSlots) || maxSlots,
-            errM: "Matching is currently locked. You can’t remove or add slots right now."
-          });
-        });
-      });
-    }
-
-    // proceed with normal unclaim
-    Slot.updateOne({_id:slotId},{studentName:"", studentEmail:""}, function(err){
-      if(err){
-        console.log(err);
-        return errorPage(res, err);
-      }
-      Student.findOne({email:userEmail},function(err,foundUser){
-        if(err){ console.log(err); return errorPage(res, err); }
-        Slot.find(function(err,slots){
-          if(err){ console.log(err); return errorPage(res, err); }
-          const array = setDisplayValues(slots);
-          makeLog("Unclaim", userEmail, slotId, slotId);
-          res.render("home", {
-            user:foundUser,
-            slots:array,
-            controls: ctrl,
-            maxSlots: (ctrl && ctrl.maxSlots) || maxSlots,
-            errM:"Successfully removed slot."
-          });
-        });
-      });
-    });
+  Slot.updateOne({_id:slotId},{studentName:"", studentEmail:""}, function(err){
+    if(err) return errorPage(res, err);
+    makeLog("Unclaim", userEmail, slotId, slotId);
+    return renderHome(res, userEmail, "Successfully removed slot.");
   });
 });
 
-
-app.post("/admin-newAccounts", function(req,res){
-  const uploadUserArray = req.body.uploadUsers;
-  let n = [];
-  var uploadUsers = uploadUserArray.split("###");
-  for(let i=0; i<uploadUsers.length; i++){
-   n.push(uploadUsers[i].split("///"));
-  }
-  n.forEach(function(user){
-    const email = user[0];
-    const password = user[1];
-    const group = user[2];
-
-    if(email&&password&&group){
-      bcrypt.hash(password,saltRounds,function(err,hashedPassword){
-        if(err){
-          console.log(err);
-          errorPage(res, err);
-        } else {
-          console.log("new student");
-          const newStudent = new Student ({
-            email:_.toLower(email),
-            password:hashedPassword,
-            group:group,
-            // matchingLocked: false,
-          });
-          newStudent.save(function(err){
-            if(err){
-              console.log(err);
-              errorPage(res, err);
-            } else {
-              console.log("Saved");
-            }
-          });
-        }
-      });
-    }
-
-  });
-  // fName /// lName /// email /// password
-  const uploadAdmins = req.body.uploadAdmins;
-  var adminsArray = uploadAdmins.split("###");
-  let m = [];
-  for(let i=0; i<adminsArray.length; i++){
-    m.push(adminsArray[i].split("///"));
-  }
-  m.forEach(function(admin){
-    const fName = admin[0];
-    const lName = admin[1];
-    const email = admin[2];
-    const password = admin[3];
-
-    if(fName&&lName&&email&&password){
-      bcrypt.hash(password,saltRounds,function(err,hashedPassword){
-        if(err){
-          console.log(err);
-          errorPage(res, err);
-        } else {
-          const newAdmin = new Admin ({
-            fName:fName,
-            lName:lName,
-            email:_.toLower(email),
-            password:hashedPassword
-          });
-          newAdmin.save(function(err){
-            if(err){
-              console.log(err);
-              errorPage(res, err);
-            } else {
-              console.log("Saved");
-            }
-          });
-        }
-      });
-    }
-  })
-
-  res.redirect("/");
-});
-
-app.post("/admin-matchSettings", function(req, res) {
-  const maxSlots = parseInt(req.body.maxSlots);
-  const lockValue = req.body.matchingLock === "true";
-
-  // keep your group checkbox handling
-  for (let i = 0; i < allGroups.length; i++) {
-    const box = req.body[allGroups[i][0]];
-    allGroups[i][1] = !!box;
-  }
-  console.log(allGroups);
-
-  Control.updateOne(
-    { id: 1 },
-    { $set: { matchingLocked: lockValue, maxSlots: maxSlots } },
-    { upsert: true },
-    function(err) {
-      if (err) {
-        console.error("Error updating Control:", err);
-        return res.redirect("/");
-      }
-
-      // (Optional) mirror to students if you still want that
-      Student.updateMany({}, { matchingLocked: lockValue }, function(err, result) {
-        if (err) {
-          console.error("Error updating students:", err);
-        } else {
-          console.log(`Updated ${result.modifiedCount} students to matchingLocked=${lockValue}`);
-        }
-        return res.redirect("/");
-      });
-    }
-  );
-});
-
-
-// app.post("/admin-emails", function(req,res){
-//   var data = "";
-//   Student.find(function(err, users){
-//     if(err){
-//       console.log(err);
-//     } else{
-//       for(let i = 0; i<users.length; i++){
-//         users[i].fName ? data=data.concat(users[i].fName,"//") : data=data.concat("!null!//")
-//         users[i].lName ? data=data.concat(users[i].lName,"//") : data=data.concat("!null!//")
-//         users[i].email ? data=data.concat(users[i].email,"//") : data=data.concat("!null!//")
-//         users[i].group ? data=data.concat(users[i].group,"//") : data=data.concat("!null!//")
-//         // Slot.findOne({studentEmail:users[i].email}, function(err,slots){
-//         //   if(err){
-//         //     console.log(err);
-//         //   } else {
-//         //     if(slots){
-//         //       data.concat("SLOT HERE!!");
-//         // //       dSlots = setDisplayValues(slots)
-//         // //       dSlots.forEach(function(thisSlot){
-//         // //         data = data.concat(thisSlot.physName,"$$",thisSlot.physSpecialty,"$$");
-//         // //         thisSlot.notes ? data=data.concat(thisSlot.notes,"$$") : data=data.concat("!null!$$")
-//         // //         data = data.concat("&&");
-//         // //       });
-//         //     }
-//         //   }
-//         // });
-//         data.concat("##");
-//       }
-//       console.log(data);
-//       res.send(data);
-//     }
-//   });
-// });
-
-
-//SERVER
-let port = process.env.PORT;
-if(port == null || port == ""){
-  port=3000;
-}
-
+// Confirm (sets confirmed flag, greys out button on home)
 app.post("/confirm", function(req, res) {
   const userEmail = _.toLower(req.body.userEmail);
 
@@ -771,231 +315,81 @@ app.post("/confirm", function(req, res) {
     { upsert: true },
     function(err) {
       if (err) return errorPage(res, err);
+      return renderHome(res, userEmail, "Successfully confirmed your slots.");
+    }
+  );
+});
 
-      Student.findOne({ email: userEmail }, function(err, foundUser) {
-        if (err) return errorPage(res, err);
+// Bulk create accounts (admins + students)
+app.post("/admin-newAccounts", function(req,res){
+  const uploadUserArray = req.body.uploadUsers || "";
+  let users = uploadUserArray.split("###").map(x => x.split("///"));
 
-        Slot.find(function(err, slots) {
-          if (err) return errorPage(res, err);
-          const array = setDisplayValues(slots);
-          res.render("home", {
-            user: foundUser,
-            slots: array,
-            controls: res.locals.controls,
-            maxSlots: (res.locals.controls && res.locals.controls.maxSlots) || maxSlots,
-            errM: "Successfully confirmed your slots."
-          });
+  users.forEach(function(user){
+    const email = user[0];
+    const password = user[1];
+    const group = user[2];
+    if(email&&password&&group){
+      bcrypt.hash(password,saltRounds,function(err,hashedPassword){
+        if(err) return;
+        const newStudent = new Student ({
+          email:_.toLower(email), password:hashedPassword, group:group
         });
+        newStudent.save(()=>{});
+      });
+    }
+  });
+
+  const uploadAdmins = req.body.uploadAdmins || "";
+  let admins = uploadAdmins.split("###").map(x => x.split("///"));
+  admins.forEach(function(admin){
+    const fName = admin[0], lName = admin[1], email = admin[2], password = admin[3];
+    if(fName&&lName&&email&&password){
+      bcrypt.hash(password,saltRounds,function(err,hashedPassword){
+        if(err) return;
+        const newAdmin = new Admin ({
+          fName, lName, email:_.toLower(email), password:hashedPassword
+        });
+        newAdmin.save(()=>{});
+      });
+    }
+  });
+
+  res.redirect("/");
+});
+
+// Admin: match settings (lock toggle, maxSlots)
+app.post("/admin-matchSettings", function(req, res) {
+  const maxSlotsValue = parseInt(req.body.maxSlots || maxSlots, 10);
+  const lockValue = req.body.matchingLock === "true";
+
+  // remember checked groups (not used elsewhere right now)
+  for (let i = 0; i < allGroups.length; i++) {
+    const box = req.body[allGroups[i][0]];
+    allGroups[i][1] = !!box;
+  }
+
+  Control.updateOne(
+    { id: 1 },
+    { $set: { matchingLocked: lockValue, maxSlots: maxSlotsValue } },
+    { upsert: true },
+    function(err) {
+      if (err) {
+        console.error("Error updating Control:", err);
+        return res.redirect("/");
+      }
+      // Optional mirror to students
+      Student.updateMany({}, { matchingLocked: lockValue }, function() {
+        return res.redirect("/");
       });
     }
   );
 });
 
+// ---- Server ----
+let port = process.env.PORT;
+if(!port) port = 3000;
+
 app.listen(port, function() {
   console.log("Server started!");
 });
-
-
-// Email string generator test
-// var studentEmailList = [];
-
-// Student.find(function(err,students){
-//   if(err){
-//     console.log(err);
-//   } else {
-//     students.forEach(function(student){
-//       studentEmailList.push([student.email,""]);
-//     });
-
-//     Slot.find(function(err,slots){
-//       if (err){
-//         console.log(err);
-//       } else {
-//         for(i = 0; i<studentEmailList.length; i++){
-//           var thisStudentSlots = [];
-//           slots.forEach(function(slot){
-//             if(slot.studentEmail == studentEmailList[i][0]){
-//               thisStudentSlots.push(slot);
-//             }
-//           });
-//           studentEmailList[i][1] = thisStudentSlots;
-
-
-
-//         }
-//         // console.log(studentEmailList);
-//       }
-//     });
-//   }
-// });
-
-// var confEmails = [];
-// Student.find(function(err,students){
-//   if(err){
-//     console.log(err);
-//   } else {
-//     allContent = ""
-//     Slot.find(function(err,slots){
-//       for(var i=0; i<students.length; i++){
-//         var thisStudentSlots = [];
-//         for (var j=0; j<slots.length; j++){
-//           if (slots[j].studentEmail == students[i].email){
-//             thisStudentSlots.push("SLOT: " + (slots[j].date.getMonth()+1) + "/" + slots[j].date.getDate() + " from " + slots[j].timeStart + " to " + slots[j].timeEnd + ", with " + slots[j].physName + " (" + slots[j].physSpecialty+"). Location: " + slots[j].location + ". Notes: " + slots[j].notes);
-//           }
-//         }
-//         var content = "";
-//         for(var k = 0; k<thisStudentSlots.length; k++){
-//           content = content + thisStudentSlots[k] + " ";
-//         }
-//         // console.log(content);
-//         if (content.length < 1){
-//           content = "None";
-//         }
-//         allContent = allContent + content + " ///";
-//         // console.log(students[i].email)
-//       }
-//       console.log(allContent)
-//     });
-//   }
-// });
-var physList = ["Bijan Sorouri","Dan Elliott","Debbie Zarek","Ijaz Anwar","Jayshree Tailor","Jeff Cramer","Nancy Fan","Nimesh Mehta","Priya Dixit-Patel","Sangita Modi","Sharad Patel","Shilpa Mehta","Stephen Kushner","Vishal Patel","Alex Bodenstab","Arun Malhotra","Ashesh Modi","Brad Bley","Brian Sarter","Craig Smucker","Damian Andrisani","Drew Brady","Gaetano Pastore","Ganesh Balu","Gregg Goldstein","Gregory Masters","Jagdeep Hundal","James Rubano","Jean Stewart","Jennifer Turano","Jeremie Axe","Joan Coker","John Kelly","Jonathan Romak","Joseph Straight","Ken Lingenfelter","Kieran Connolly","Michael Teixido","Neil Hockstein","Paul Imber","Pawan Rastogi","Prasad Kanchana","Prayus Tailor","Pulak Ray","Randeep Kahlon","Scott Roberts","Tom Barnett","W. Scott Newcomb, DPM","William Sheppard"];
-// var physList = ["Alex Bodenstab","Anjala Pahwa","Arlen Stone","Beenish Ahmed","Brian Galinat","Craig Smucker","Debbie Zarek","Drew Brady","Eric Johnson","Evan Lapinsky","Gaurav Jain","Gregg Goldstein","Gregory Masters","Harry Lebowitz","Jagdeep Hundal","James Rubano","Jayshree Tailor","Jean Stewart","Jennifer Turano","Jiao Junfang","Joan Coker","Jonathan Romak","Joseph Straight","Kieran Connolly","Kimberly Rogers","Matthew McCarter","Matt Handling","Michael Teixido","Michael Pushkarewicz","Nancy Fan","Neil Hockstein","Paul Imber","Pawan Rastogi","Prasad Kanchana","Pulak Ray","Rob Winter","Steve Dellose","Steve Rybicki","Stephen Kushner","William Newell","William Sheppard","W. Scott Newcomb, DPM","Ken Lingenfelter"];
-// var sList = [["arjankahlon@gmail.com", "Arjan Kahlon"],["anastasiarigas13@gmail.com", "Anastasia Rigas"],["ciannic31@gmail.com", "Cianni Covert"],["so.emily@charterschool.org", "Emily So"],["estherchung0922@gmail.com", "Esther Chung"],["kaurjasleen2004@gmail.com", "Jasleen Kaur"],["ths2263@towerhill.org", "Lauren Kulda"],["pelane2004@gmail.com", "Paige Lane"],["samveda.menon@gmail.com", "Samveda Menon"],["preba0914@icloud.com", "Sariaya Oommen"],["abcholewa1@gmail.com", "Abigail Cholewa"],["adeebaallim@gmail.com", "Adeeba Allimulla"],["guninadrika@gmail.com", "Adrika Gunin"],["raikahlon1@gmail.com", "Amanrai Kahlon"],["amdrushler@gmail.com", "Amelia Drushler"],["acmorlet@gmail.com", "Anais Morlet"]];
-// var sList = [["apezzuto@ursuline.org", "Angelina Pezzuto"],["anshdesai46@gmail.com", "Ansh Desai"],["griffbrooke11@gmail.com", "Brooke Griffin"],["ths2360@towerhill.org", "Cameron Haskins"],["cecifant23@ncs.charter.k12.de.us", "Cecilia Fantini"],["celinelourde@hotmail.com", "Celine Lourdemaria"],["charlotte90210@outlook.com", "Charlotte Walder"],["dheedant23@ncs.charter.k12.de.us", "Dheeraj Danthuluri"],["dudhiadiya4@gmail.com", "Diya Dudhia"]];
-// var sList = [["annasagaram.meghnaraj@charterschool.org", "Meghna Annasagaram"],["pgedelman@gmail.com", "Paul Edelman"],["puiyee.de@gmail.com", "Puiyee Kong"],["sahasubb23@ncs.charter.k12.de.us", "Saharsh Subbasani"],["chittakone.021@gmail.com", "Samantha Chittakone"],["samraiqbal1013@gmail.com", "Samra Iqbal"],["sindsiva23@ncs.charter.k12.de.us", "Sindhu Sivasankar"],["srijay.chenna@gmail.com", "Srijay Chenna"],["suhabhat23@ncs.charter.k12.de.us", "Suhani Bhatt"],["kedda.tara@charterschool.org", "Tara Kedda"],["vadhera.varun@charterschool.org", "Varun Vadhera"],["wynnkama23@ncs.charter.k12.de.us", "Wynnie Kamau"]];
-// var sList = [["sawdeye23@sanfordschool.org", "Eva Sawdey"],["cokerh23@sanfordschool.org", "Helena Coker"],["mancuso.jack@charterschool.org", "Jack Mancuso"],["jasminelee03@gmail.com", "Jasmine Lee"],["johanjc04@gmail.com", "Johan Cheruvannoor"],["kimorahbrisco@gmail.com", "Kimorah Brisco"],["madsrieger@icloud.com", "Madison Rieger"],["s.matthew.haimowitz@redclayschools.com", "Matthew Haimowitz"]];
-var sList = [["suveer.ganta@gmail.com", "Suveer Ganta"],["so.emily@charterschool.org", "Emily So "],["ths2263@towerhill.org", "Lauren Kulda "]];
-// ["nidhipatel0943@gmail.com", "Nidhi Patel "],
-// ["daga.kirti@charterschool.org", "Kirti Daga"],
-// ["kaurjasleen2004@gmail.com", "Jasleen Kaur"],
-// ["samveda.menon@gmail.com", "Samveda Menon"],
-// ["preba0914@icloud.com", "Sariaya Oommen"],
-// ["abigail_mclaughlin@yahoo.com", "Abby McLaughlin"],
-// ["kyleelev01@gmail.com", "Kylee"],
-// ["pelane2004@gmail.com", "Paige Lane"],
-// ["eanewcomb16@gmail.com", "Emily Newcomb"],
-// ["emilyhaney0@gmail.com", "Emily Haney"],
-// ["ameetabalaji23@gmail.com", "Ameeta Balaji"],["anastasiarigas13@gmail.com", "Anastasia Rigas"],
-// ["mlrush2123@gmail.com", "Miranda Rush"],
-// ["sindhu.narayan20@gmail.com", "Sindhu Narayan"],
-// ["mstelyn@gmail.com", "Mackenzie Stelyn"],
-// ["ciannic31@gmail.com", "Cianni Covert"],
-// ["chizaramogbunamiri@gmail.com", "Chizaram Ogbunamiri "],
-// ["ths22117@towerhill.org", "Paige Zhang"],
-// ["adhya654@gmail.com", "Adhya Anilkumar "],
-// ["priyal.patel.199030@gmail.com", "Priyal Patel"],
-// ["lucybtaylor24@gmail.com", "Lucy Taylor"],
-// ["elana.agarwal@gmail.com", "Elana Agarwal"],
-// ["wes.mah03@gmail.com", "Wesley Mah"],
-// ["brahmbhatt.siya@gmail.com", "Siya Brahmbhatt "],
-// ["mkounga21@archmereacademy.com", "Maeva Kounga"],
-// ["aemsley7@gmail.com", "Abigail Emsley"],
-// ["boyapati.shriya@charterschool.org", "Shriya Boyapati "],
-// ["estherchung0922@gmail.com", "Esther Chung"],
-// ["samraiqbal1013@gmail.com", "Samra Iqbal"],
-// ["srijay.chenna@gmail.com", "Srijay Chenna"],
-// ["raikahlon1@gmail.com", "Amanrai (Rai) Kahlon"],
-// ["cornwallo21@sanfordschool.org", "Liv Cornwall "],
-// ["sombaytwail@gmail.com", "Samara Durgadin"],
-// ["arjankahlon@gmail.com", "Arjan Kahlon"],
-// ["codwyer23@archmereacademy.com", "Clare O'Dwyer"],
-// ["puiyee.de@gmail.com", "Puiyee Kong"],
-// ["kimraph22@ncs.charter.k12.de.us", "Raphael Kim"],
-// ["ciannic31@gmail.com", "Cianni Covert"]];
-
-allContent = ""
-Slot.find(function(err,slots){
-  for(var i=0; i<physList.length; i++){
-    var thisPhysSlots = [];
-    for (var j=0; j<slots.length; j++){
-      if (slots[j].physName == physList[i]){
-        for (var k=0; k< sList.length; k++){
-          if (sList[k][0] == slots[j].studentEmail){
-            var thisName = sList[k][1]
-            thisPhysSlots.push("SLOT: " + (slots[j].date.getMonth()+1) + "/" + slots[j].date.getDate() + " from " + slots[j].timeStart + " to " + slots[j].timeEnd + ", with Dr. " + slots[j].physName + " (" + slots[j].physSpecialty+"). Location: " + slots[j].location + ". Student Name: " + thisName);
-            // console.log(thisName+ ",   " + slots[j].studentEmail);
-          }
-        }
-      }
-    }
-    var content = "";
-    for(var k = 0; k<thisPhysSlots.length; k++){
-      content = content + thisPhysSlots[k] + " ";
-    }
-    // console.log(content);
-    if (content.length < 1){
-      content = "None";
-    }
-    allContent = allContent + content + " ///";
-    // console.log(students[i].email)
-  }
-  console.log(allContent)
-});
-
-// Slot.find(function(err,slots){
-//   if(err){
-//     console.log(err);
-//   } else {
-//     for(var i=0; i<slots.length-1; i++){
-//       console.log(slots[i].studentEmail + ",    " + slots[i].studentName)
-
-//       // if(slots[i].studentEmail != null){
-//       //   Student.find({email:slots[i].studentEmail},function(err, thisStudent){
-//       //     Slot.updateOne({_id: slots[i]._id},{studentName: thisStudent.fName + " " + thisStudent.lName},function(err){
-  
-//       //     });
-    
-//       //   });
-//       // }    
-    
-//   }
-  
-// }
-// });
-
-// Mon Nov 22 00:00:00 GMT-08:00 2021
-
-// app.post("/admin-newSlots", function(req,res){
-//   console.log("here");
-//   var slotString = req.body.uploadSlots;
-// // slotString = "Alex Bodenstab+++Orthopaedics/Joint Replacement+++Wed Nov 10 00:00:00 GMT-08:00 2021+++1:00 PM+++5:00 PM+++MAP1 Suite 238 4745 Ogletown Stanton Rd Newark DE 19713++++++43";
-
-//   const uploadSlotArray = slotString;
-//   let n = [];
-//   var uploadSlots = uploadSlotArray.split("###");
-//   for(let i=0; i<uploadSlots.length; i++){
-//     n.push(uploadSlots[i].split("+++"));
-//   }
-//   n.forEach(function(slot){
-//     const name = slot[0];
-//     const specialty = slot[1];
-//     const date = slot[2];
-//     const start = slot[3];
-//     const end = slot[4];
-//     const address = slot[5];
-//     const notes = slot[6];
-//     const id = slot[7];
-
-//     const newSlot = new Slot ({
-//       physName: name,
-//       date: date,
-//       timeStart: start,
-//       physSpecialty:specialty,
-//       timeEnd: end,
-//       location:address,
-//       notes:notes,
-//       testId:id
-//     });
-//     var dateobj = new Date(date)
-//     console.log(dateobj);
-//     newSlot.save(function(err){
-//       if(err){
-//         console.log(err);
-//         errorPage(res, err);
-//       } else {
-//         console.log("Saved slot " + id);
-//       }
-//     });
-      
-//   });
-// });
