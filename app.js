@@ -398,6 +398,38 @@ app.post("/admin-matchSettings", function(req, res) {
   );
 });
 
+// --- Admin: reset ALL confirmations (clean slate) ---
+app.post("/admin-reset-confirms", async function(req, res) {
+  try {
+    // Clean slate: remove the `confirmed` field from all docs
+    await Confirm.updateMany({}, { $unset: { confirmed: "" } });
+    // Optional: also remove empty docs (no fields left) — uncomment if you want
+    // await Confirm.deleteMany({ confirmed: { $exists: false } });
+
+    return res.redirect("/");
+  } catch (err) {
+    return errorPage(res, err);
+  }
+});
+
+// --- Admin: clear confirmation for ONE student ---
+app.post("/admin-clear-confirm", async function(req, res) {
+  try {
+    const email = _.toLower(req.body.email || "");
+    if (!email) return res.redirect("/");
+
+    // Remove the confirmed flag for this one student
+    await Confirm.updateOne({ email }, { $unset: { confirmed: "" } }, { upsert: false });
+
+    // Optional alternative: fully delete their Confirm doc
+    // await Confirm.deleteOne({ email });
+
+    return res.redirect("/");
+  } catch (err) {
+    return errorPage(res, err);
+  }
+});
+
 // ---- Server ----
 let port = process.env.PORT;
 if(!port) port = 3000;
