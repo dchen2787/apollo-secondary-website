@@ -293,6 +293,131 @@ async function renderAdminHome(res, flashMsg = "", lyteOnly = false) {
   }
 }
 
+// ---- CSV helpers ----
+function csvEscape(val) {
+  if (val === null || val === undefined) return "";
+  const s = String(val);
+  if (/[",\n]/.test(s)) {
+    return `"${s.replace(/"/g, '""')}"`;
+  }
+  return s;
+}
+
+function parseTimeToMinutes(t) {
+  // expects formats like "1:00 PM", "09:30 am"
+  if (!t) return null;
+  const m = String(t).trim().match(/^(\d{1,2}):(\d{2})\s*([AaPp][Mm])$/);
+  if (!m) return null;
+  let hh = parseInt(m[1], 10);
+  const mm = parseInt(m[2], 10);
+  const ampm = m[3].toLowerCase();
+  if (ampm === "pm" && hh !== 12) hh += 12;
+  if (ampm === "am" && hh === 12) hh = 0;
+  return hh * 60 + mm;
+}
+
+function slotDurationHours(slot) {
+  // derive duration from timeStart/timeEnd
+  const a = parseTimeToMinutes(slot.timeStart);
+  const b = parseTimeToMinutes(slot.timeEnd);
+  if (a == null || b == null) return 0;
+  let diff = b - a;
+  // if an overnight weirdness ever occurs, clamp to 0+
+  if (diff < 0) diff = 0;
+  return diff / 60;
+}
+
+// Export: Students CSV (includes total hours + slot count, filterable by LYTE & school)
+app.get("/admin/export/students.csv", async function(req, res) {
+  try {
+    const filter = {};
+    if (req.query.lyte === "1") filter.isLyte = true;
+    if (req.query.school && req.query.school.trim()) filter.school = req.query.school.trim();
+
+    const [students, slots] = await Promise.all([
+      Student.find(filter).lean(),
+      Slot.find({}).lean()
+    ]);
+
+    // Pre-index slots by studentEmail for faster aggregation
+    const byEmail = new Map();
+    slots.forEach(s => {
+      const email = (s.studentEmail || "").toLowerCase();
+      if (!email) return;
+      if (!byEmail.has(email)) byEmail.set(email, []);
+      byEmail.get(email).push(s);
+    });
+
+    let rows = [];
+    rows.push([
+      "Email","First Name","Last Name","Group","Is LYTE","School",
+      "Total Slots","Total Hours"
+    ].map(csvEscape).join(","));
+
+    students.forEach(st => {
+      const email = (st.email || "").toLowerCase();
+      const mySlots = byEmail.get(email) || [];
+      const totalSlots = mySlots.length;
+      const totalHours = mySlots.reduce((sum, s) => sum + slotDurationHours(s), 0);
+      rows.push([
+        email,
+        st.fName || "",
+        st.lName || "",
+        st.group || "",
+        st.isLyte ? "yes" : "no",
+        st.school || "",
+        String(totalSlots),
+        totalHours.toFixed(2)
+      ].map(csvEscape).join(","));
+    });
+
+    const csv = rows.join("\n");
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", "attachment; filename=students.csv");
+    res.send(csv);
+  } catch (e) {
+    return errorPage(res, e);
+  }
+});
+
+// Export: Slots CSV (every slot with who picked it)
+app.get("/admin/export/slots.csv", async function(req, res) {
+  try {
+    const slots = await Slot.find({}).lean();
+    let rows = [];
+    rows.push([
+      "Physician","Specialty","Date","Start","End","Location","Notes",
+      "Student Name","Student Email","Hours"
+    ].map(csvEscape).join(","));
+
+    slots.forEach(s => {
+      const hours = slotDurationHours(s);
+      // date display falls back to raw if dDate isn't present
+      const dDate = s.dDate || (s.date ? new Date(s.date).toISOString().slice(0,10) : "");
+      rows.push([
+        s.physName || "",
+        s.physSpecialty || "",
+        dDate,
+        s.timeStart || "",
+        s.timeEnd || "",
+        s.location || "",
+        s.notes || "",
+        s.studentName || "",
+        s.studentEmail || "",
+        hours ? hours.toFixed(2) : "0"
+      ].map(csvEscape).join(","));
+    });
+
+    const csv = rows.join("\n");
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", "attachment; filename=slots.csv");
+    res.send(csv);
+  } catch (e) {
+    return errorPage(res, e);
+  }
+});
+
+
 // ---- Routes ----
 // GET
 app.get("/", function (req, res) {
@@ -361,22 +486,63 @@ app.post("/login", function (req, res) {
   });
 });
 
-// POST — Admin login -> go to admin dashboard
-app.post("/admin-login", function (req, res) {
-  const email = _.toLower(req.body.email);
-  const password = req.body.password;
+app.post("/admin-newAccounts", function(req,res){
+  const uploadUserArray = req.body.uploadUsers || "";
+  // each student: email///password///group///isLyte///school  (group/isLyte/school optional, but in this order)
+  const users = uploadUserArray
+    .split("###")
+    .map(x => x.trim())
+    .filter(Boolean)
+    .map(x => x.split("///"));
 
-  Admin.findOne({ email }, function (err, foundAdmin) {
-    if (err) return res.render("admin-login", { errM: "An error occurred. Please try again." });
-    if (!foundAdmin) return res.render("admin-login", { errM: "Email not found." });
+  function toBool(x){
+    if (!x) return false;
+    const v = String(x).trim().toLowerCase();
+    return v === "y" || v === "yes" || v === "true" || v === "1";
+  }
 
-    bcrypt.compare(password, foundAdmin.password, async function (err, ok) {
-      if (err) return res.render("admin-login", { errM: "An error occurred. Please try again." });
-      if (!ok) return res.render("admin-login", { errM: "Incorrect password." });
-      return renderAdminHome(res, "Logged in.");
-    });
+  users.forEach(function(parts){
+    const email = parts[0];
+    const password = parts[1];
+    const group = parts[2] || "";
+    const isLyte = toBool(parts[3]);
+    const school = parts[4] || "";
+
+    if(email && password){
+      bcrypt.hash(password, saltRounds, function(err, hashedPassword){
+        if(err) return;
+        const newStudent = new Student({
+          email: _.toLower(email),
+          password: hashedPassword,
+          group,
+          isLyte,
+          school
+        });
+        newStudent.save(()=>{});
+      });
+    }
   });
+
+  // Admins unchanged: First///Last///email///password (still separated by ### between accounts)
+  const uploadAdmins = req.body.uploadAdmins || "";
+  const admins = uploadAdmins
+    .split("###")
+    .map(x => x.trim()).filter(Boolean)
+    .map(x => x.split("///"));
+
+  admins.forEach(function(a){
+    const fName = a[0], lName = a[1], email = a[2], password = a[3];
+    if(fName && lName && email && password){
+      bcrypt.hash(password, saltRounds, function(err, hashedPassword){
+        if(err) return;
+        new Admin({ fName, lName, email: _.toLower(email), password: hashedPassword }).save(()=>{});
+      });
+    }
+  });
+
+  res.redirect("/");
 });
+
 
 // POST — Claim (blocked if matchingLocked)
 app.post("/claim", function (req, res) {
