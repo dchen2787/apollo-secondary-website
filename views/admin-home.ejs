@@ -1,120 +1,111 @@
 <%- include("./partials/header"); -%>
 <div id="view-shadow-slots">
-<h1>Controls</h1>
-<hr><br />
-<form class="" action="/admin-newAccounts" method="post">
-  <h4>Create New Accounts</h4><br />
-  <label>New Student Users: (email///password///group###)</label>
-  <input type="text" name="uploadUsers">
+
+  <h1>Controls</h1>
+  <hr><br />
+  <form action="/admin-newAccounts" method="post">
+    <h4>Create New Accounts</h4><br />
+    <label>New Student Users: (email///password///group###)</label>
+    <input type="text" name="uploadUsers">
+    <br /><br />
+    <label>New Admin: (First///Last///email///password###)</label>
+    <input type="text" name="uploadAdmins">
+    <br /><br />
+    <button type="submit" class="btn">Update</button>
+  </form>
+
+  <!--
+  <form action="/admin-newSlots" method="post">
+    <h4>Create New Slots</h4><br />
+    <input type="text" name="uploadSlots">
+    <br /><br />
+    <button type="submit" class="btn">Update</button>
+  </form>
+  -->
+
   <br /><br />
-  <label>New Admin: (First///Last///email///password###)</label>
-  <input type="text" name="uploadAdmins">
-  <br />  <br />
-  <button type="submit" class="btn" name="button">Update</button>
-</form>
+  <hr /><br />
+  <form action="/admin-matchSettings" method="post">
+    <h4>Match Settings</h4><br/>
+    <label>Max Slots Per Student:</label>
+    <input type="number" name="maxSlots" value="<%= maxSlots %>">
+    <br /><br />
 
-<!-- <form class="" action="/admin-newSlots" method="post">
-  <h4>Create New Slots</h4><br />
-  <input type="text" name="uploadSlots">
-  <br />  <br />
-  <button type="submit" class="btn" name="button">Update</button>
-</form> -->
-
-<br /><br />
-<hr /><br />
-<form action="/admin-matchSettings" method="post">
-  <h4>Match Settings</h4><br/>
-  <label>Max Slots Per Student:</label>
-  <input type="number" name="maxSlots" value=<%=maxSlots%>>
-  <br /><br />
-
-  <label>Matching allowed for: (Year/session joined, grad year)</label>
-  <br />
-  <% for(let i = 0; i<allGroups.length; i++){%>
-    <% var boxStatus = "";%>
-    <% allGroups[i][1] ? boxStatus = "checked" : null %>
-    <!-- Insert: if group is already allowed, set to checked-->
-    <input type="checkbox" name="<%=allGroups[i][0]%>" <%=boxStatus%>>
-    <%=allGroups[i][0] %>
+    <label>Matching allowed for: (Year/session joined, grad year)</label>
     <br />
-  <% } %>
-  <br />
-  <button type="submit" name="button" class="btn">Update Access</button>
-</form>
-<br /><br /><hr><br />
-<form class="" action="/admin-emails" method="post">
-  <h4>Automatic Emails</h4><br />
-  <button type="submit" name="button" class="btn">Get String</button>
-</form>
-<br /><hr><br />
-<h4>Confirm Status</h4><br /> 
-<!-- future todo: make only students who have 1+ slot show up -->
-<% confirms.forEach(function(confirm){ %>
+    <% for (let i = 0; i < allGroups.length; i++) { %>
+      <% var boxStatus = allGroups[i][1] ? "checked" : ""; %>
+      <input type="checkbox" name="<%= allGroups[i][0] %>" <%= boxStatus %>>
+      <%= allGroups[i][0] %>
+      <br />
+    <% } %>
+    <br />
+    <button type="submit" class="btn">Update Access</button>
+  </form>
 
-<div class="row">
-  <div class="col col-6">
-    <%= confirm.email %>
+  <br /><br /><hr><br />
+
+  <form action="/admin-emails" method="post">
+    <h4>Automatic Emails</h4><br />
+    <button type="submit" class="btn">Get String</button>
+  </form>
+
+  <br /><hr><br />
+
+  <h4>Confirm Status</h4><br />
+  <!-- future todo: make only students who have 1+ slot show up -->
+  <% confirms.forEach(function(confirm){ %>
+    <div class="row">
+      <div class="col col-6">
+        <%= confirm.email %>
+      </div>
+      <div class="col col-6">
+        <%= confirm.confirmed %>
+      </div>
+    </div>
+  <% }); %>
+
+  <br /><hr><br />
+
+  <h1 id="shadow-slots-head">Shadow Slots</h1>
+
+  <div class="row chart-titles">
+    <div class="col col-12 col-lg-2">Physician</div>
+    <div class="col col-12 col-lg-2">Date</div>
+    <div class="col col-12 col-lg-2">Time</div>
+    <div class="col col-12 col-lg-2">Location</div>
+    <div class="col col-12 col-lg-2">Notes</div>
+    <div class="col col-12 col-lg-2">Matched?</div>
   </div>
-  <div class= "col col-6">
-    <%= confirm.confirmed %>
-  </div>
-</div>
-<% }); %>
+  <hr>
 
-<br /><hr><br />
-
-<h1 id="shadow-slots-head">Shadow Slots</h1>
-<!-- <div class="container"> -->
-  <div class="row">
-    <div class="col col-12 col-lg-2">
-      Physician
-    </div>
-    <div class="col col-12 col-lg-2">
-      Date
-    </div>
-    <div class="col col-12 col-lg-2">
-      Time
-    </div>
-    <div class="col col-12 col-lg-2">
-      Location
-    </div>
-    <div class="col col-12 col-lg-2">
-      Notes
-    </div>
-    <div class="col col-12 col-lg-2">
-      Matched?
-    </div>
-  </div>
-<hr>
-<% slots.forEach(function(slot){ %>
-
-<div class="row">
+  <% slots.forEach(function(slot){ %>
+    <div class="row">
       <div class="col col-12 col-lg-2">
-        <%= slot.physName %>, <%=slot.physSpecialty %>
+        <%= slot.physName || '-' %><%= (slot.physSpecialty ? ', ' + slot.physSpecialty : '') %>
       </div>
       <div class="col col-12 col-lg-2">
-        <%= slot.dDate %>
+        <%= slot.dDate || '-' %>
       </div>
       <div class="col col-12 col-lg-2">
-        <%= slot.timeStart %> to <%= slot.timeEnd %>
+        <%= (slot.timeStart || '-') %> to <%= (slot.timeEnd || '-') %>
       </div>
       <div class="col col-12 col-lg-2">
-        <%= slot.location %>
+        <%= slot.location || '-' %>
       </div>
       <div class="col col-12 col-lg-2">
-        <%= slot.notes %>
+        <%= (slot.notes && slot.notes.trim()) ? slot.notes : '-' %>
       </div>
       <div class="col col-12 col-lg-2">
-        <% if (slot.studentEmail){ %>
-          <%=slot.studentName%> , <%=slot.studentEmail %>
+        <% if (slot.studentEmail && slot.studentEmail.length) { %>
+          <%= (slot.studentName || '') %><%= slot.studentName ? ' , ' : '' %><%= slot.studentEmail %>
         <% } else { %>
           -
         <% } %>
       </div>
     </div>
+    <hr />
+  <% }); %>
 
-<hr />
-<% }); %>
 </div>
-
 <%- include("./partials/footer"); -%>
