@@ -226,28 +226,32 @@ app.post("/login", function(req,res){
 });
 
 // Admin login
-app.post("/admin-login", function(req,res){
+app.post("/admin-login", function(req, res) {
   const email = _.toLower(req.body.email);
   const password = req.body.password;
 
-  Admin.findOne({email}, function(err, foundAdmin){
-    if(err) return res.render("admin-login",{errM:"An error occured. Please try again."});
-    if(!foundAdmin) return res.render("admin-login",{errM:"Email not found."});
+  Admin.findOne({ email }, function(err, foundAdmin) {
+    if (err) return res.render("admin-login", { errM: "An error occurred. Please try again." });
+    if (!foundAdmin) return res.render("admin-login", { errM: "Email not found." });
 
-    bcrypt.compare(password, foundAdmin.password, function(err, ok){
-      if(err || !ok) return res.render("admin-login",{errM:"Incorrect password."});
+    bcrypt.compare(password, foundAdmin.password, function(err, ok) {
+      if (err) return res.render("admin-login", { errM: "An error occurred. Please try again." });
+      if (!ok) return res.render("admin-login", { errM: "Incorrect password." });
 
-      Slot.find(function(err,slots){
-        if(err) return errorPage(res, err);
-        updateGroups();
+      Slot.find(function(err, slots) {
+        if (err) return errorPage(res, err);
+
+        // add display helpers (dDate, isPCP) and sort
         const array = setDisplayValues(slots);
-        Confirm.find(function(err,confirms){
-          if(err) return errorPage(res, err);
+
+        Confirm.find(function(err, confirms) {
+          if (err) return errorPage(res, err);
+
           res.render("admin-home", {
             slots: array,
             maxSlots: (res.locals.controls && res.locals.controls.maxSlots) || maxSlots,
             allGroups: allGroups.sort(),
-            confirms: confirms
+            confirms
           });
         });
       });
