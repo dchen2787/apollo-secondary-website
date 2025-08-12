@@ -25,6 +25,57 @@
 
   <br /><br />
   <hr /><br />
+  <!-- CSV download toggle -->
+
+  <br/>
+  <div style="margin: 12px 0;">
+    <a class="btn" href="/admin/export/students.csv">Download Students CSV</a>
+    <a class="btn" href="/admin/export/students.csv?lyte=1">Download LYTE Students CSV</a>
+    <a class="btn" href="/admin/export/slots.csv">Download Slots CSV</a>
+  </div>
+  <br/>
+
+  <!-- student filter toggle -->
+  <div style="margin: 10px 0;">
+    <% if (lyteOnly) { %>
+      <a href="/admin" class="btn btn-light">Show all students</a>
+    <% } else { %>
+      <a href="/admin?lyte=true" class="btn btn-light">Show LYTE only</a>
+    <% } %>
+  </div>
+  
+  <h2>Student Hours <%= lyteOnly ? "(LYTE only)" : "" %></h2>
+  <div class="row font-weight-bold">
+    <div class="col-12 col-md-4">Student</div>
+    <div class="col-12 col-md-3">Email</div>
+    <div class="col-12 col-md-3">School</div>
+    <div class="col-12 col-md-2">Hours</div>
+  </div>
+  <hr/>
+  <% (studentHours || []).forEach(function(s){ %>
+    <div class="row">
+      <div class="col-12 col-md-4"><%= s.name || "(no name)" %> <%= s.isLyte ? "• LYTE" : "" %></div>
+      <div class="col-12 col-md-3"><%= s.email %></div>
+      <div class="col-12 col-md-3"><%= s.school || "(No school)" %></div>
+      <div class="col-12 col-md-2"><%= s.hours.toFixed(2) %></div>
+    </div>
+    <hr/>
+  <% }) %>
+  
+  <h2>Hours by School</h2>
+  <div class="row font-weight-bold">
+    <div class="col-12 col-md-8">School</div>
+    <div class="col-12 col-md-4">Total Hours</div>
+  </div>
+  <hr/>
+  <% (hoursBySchool || []).forEach(function(r){ %>
+    <div class="row">
+      <div class="col-12 col-md-8"><%= r.school %></div>
+      <div class="col-12 col-md-4"><%= r.hours.toFixed(2) %></div>
+    </div>
+    <hr/>
+  <% }) %>
+
   <form action="/admin-matchSettings" method="post">
     <h4>Match Settings</h4><br/>
     <label>Max Slots Per Student:</label>
