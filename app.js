@@ -65,6 +65,7 @@ const Confirm = mongoose.model("Confirm", confirmSchema);
 const controlSchema = new mongoose.Schema({
   maxSlots: Number,
   PCPonly: Boolean,
+  matchingLocked: { type: Boolean, default: false },
   id: Number, //future: add groups allowed
 })
 const Control = mongoose.model("Control", controlSchema);
@@ -444,153 +445,147 @@ app.post("/admin-login", function(req,res){
 app.post("/claim", function(req,res){
   const userFName = req.body.userFName;
   const userLName = req.body.userLName;
-  const userName = userFName.concat(" ",userLName);
+  const userName  = userFName.concat(" ",userLName);
   const userEmail = _.toLower(req.body.userEmail);
-  const slotId = req.body.slotId;
+  const slotId    = req.body.slotId;
 
-  Slot.findOne({_id:slotId}, function(err,thisSlot){
-    if(err){
-      console.log(err);
-      errorPage(res, err);
-    } else {
-      //PCP only gaurd
-      const pcpOnly = res.locals.controls && res.locals.controls.PCPonly === true;
-      if (pcpOnly && !isPCPSlot(thisSlot)) {
-        return Student.findOne({ email: userEmail }, function(err, foundUser) {
-        if (err) {
-          console.log(err); 
-          return errorPage(res, err); 
-        }
+  Control.findOne({ id: 1 }).lean().exec(function(err, ctrl) {
+    if (err) { console.log(err); return errorPage(res, err); }
+
+    // A) global lock guard
+    if (ctrl && ctrl.matchingLocked === true) {
+      return Student.findOne({ email: userEmail }, function(err, foundUser) {
+        if (err) { console.log(err); return errorPage(res, err); }
         Slot.find(function(err, slots){
-          if (err) { 
-            console.log(err); 
-            return errorPage(res, err); 
-          }
+          if (err) { console.log(err); return errorPage(res, err); }
           const array = setDisplayValues(slots);
           return res.render("home", {
             user: foundUser,
             slots: array,
-            controls: res.locals.controls,
-            maxSlots: (res.locals.controls && res.locals.controls.maxSlots) || maxSlots,
-            errM: "PCP-only is active. You can only claim primary-care slots right now."
+            controls: ctrl,
+            maxSlots: (ctrl && ctrl.maxSlots) || maxSlots,
+            errM: "Matching is currently locked. You can review your matches but cannot add new ones."
           });
         });
       });
     }
-      if (thisSlot.studentEmail){ // in case page isn't reloaded and someone else already claimed the slot
-        if (thisSlot.studentEmail.length>0){ // works with new default of "" rather than null
-          Student.findOne({email:userEmail},function(err,foundUser){
-            if(err){
-              console.log(err);
-              errorPage(res, err);
-            } else {
-              Slot.find(function(err,slots){
-                if(err){
-                  console.log(err);
-                  errorPage(res, err);
-                } else {
-                  const array = setDisplayValues(slots);
-                  makeLog("Claim: already claimed", userEmail, slotId, slotId);
-                  res.render("home", {
-                    user: foundUser,
-                    slots: array,
-                    controls: res.locals.controls,
-                    maxSlots: (res.locals.controls && res.locals.controls.maxSlots) || maxSlots,
-                    errM: "This slot was already claimed. Please reload the page frequently to see all available shadow slots."
-                  });
-                }
-              });
-            }
-          });
-        }
-      } else { //slot was not already claimed
-        Slot.updateOne({_id:slotId},{studentName:userName, studentEmail:userEmail}, function(err){
-          if(err){
-            console.log(err);
-            errorPage(res, err);
-          } else {
-            Student.findOne({email:userEmail},function(err,foundUser){
-              if(err){
-                console.log(err);
-                errorPage(res, err);
-              } else {
-                Slot.find(function(err,slots){
-                  if(err){
-                    console.log(err);
-                    errorPage(res, err);
-                  } else {
-                    const array = setDisplayValues(slots);
-                    makeLog("Claim slot", userEmail, slotId, slotId);
-                    res.render("home", {user:foundUser, slots:array, controls:res.locals.controls, maxSlots:(res.locals.controls && res.locals.controls.maxSlots) || maxSlots, errM:"Successfully matched."});
-                  }
-                });
-              }
+
+    // B) load slot, then PCP-only guard + filled guard
+    Slot.findOne({_id:slotId}, function(err,thisSlot){
+      if(err){ console.log(err); return errorPage(res, err); }
+      if (!thisSlot) { 
+        console.log("Slot not found:", slotId);
+        return errorPage(res, "Slot not found.");
+      }
+
+      // PCP-only guard (server-side)
+      if (ctrl && ctrl.PCPonly === true && !isPCPSlot(thisSlot)) {
+        return Student.findOne({ email: userEmail }, function(err, foundUser) {
+          if (err) { console.log(err); return errorPage(res, err); }
+          Slot.find(function(err, slots){
+            if (err) { console.log(err); return errorPage(res, err); }
+            const array = setDisplayValues(slots);
+            return res.render("home", {
+              user: foundUser,
+              slots: array,
+              controls: ctrl,
+              maxSlots: (ctrl && ctrl.maxSlots) || maxSlots,
+              errM: "PCP-only is active. You can only claim primary‑care slots right now."
             });
-          }
+          });
         });
       }
-    }
-  });
 
+      // Already filled?
+      if (thisSlot.studentEmail && thisSlot.studentEmail.length > 0) {
+        return Student.findOne({email:userEmail},function(err,foundUser){
+          if(err){ console.log(err); return errorPage(res, err); }
+          Slot.find(function(err,slots){
+            if(err){ console.log(err); return errorPage(res, err); }
+            const array = setDisplayValues(slots);
+            return res.render("home", {
+              user: foundUser,
+              slots: array,
+              controls: ctrl,
+              maxSlots: (ctrl && ctrl.maxSlots) || maxSlots,
+              errM: "This slot was already claimed. Please reload the page to see the latest availability."
+            });
+          });
+        });
+      }
+
+      // C) claim it
+      Slot.updateOne({_id:slotId},{studentName:userName, studentEmail:userEmail}, function(err){
+        if(err){ console.log(err); return errorPage(res, err); }
+        Student.findOne({email:userEmail},function(err,foundUser){
+          if(err){ console.log(err); return errorPage(res, err); }
+          Slot.find(function(err,slots){
+            if(err){ console.log(err); return errorPage(res, err); }
+            const array = setDisplayValues(slots);
+            makeLog("Claim slot", userEmail, slotId, slotId);
+            return res.render("home", {
+              user:foundUser,
+              slots:array,
+              controls: ctrl,
+              maxSlots: (ctrl && ctrl.maxSlots) || maxSlots,
+              errM:"Successfully matched."
+            });
+          });
+        });
+      });
+    });
+  });
 });
 
 app.post("/unclaim", function(req,res){
   const slotId = req.body.slotId;
   const userEmail = _.toLower(req.body.userEmail);
-// IMPORTANT - make this only reset if it is still the same student who is posting
-  Slot.updateOne({_id:slotId},{studentName:"", studentEmail:""}, function(err){
-    if(err){
-      console.log(err);
-      errorPage(res, err);
-    } else {
-      Student.findOne({email:userEmail},function(err,foundUser){
-        if(err){
-          console.log(err);
-          errorPage(res, err);
-        } else {
-          Slot.find(function(err,slots){
-            if(err){
-              console.log(err);
-              errorPage(res, err);
-            } else {
-              const array = setDisplayValues(slots);
-              makeLog("Unclaim", userEmail, slotId, slotId);
-              res.render("home", {user:foundUser, slots:array, controls:res.locals.controls, maxSlots:(res.locals.controls && res.locals.controls.maxSlots) || maxSlots, errM:"Successfully removed slot."});
-            }
+
+  // deny if globally locked
+  Control.findOne({ id: 1 }).lean().exec(function(err, ctrl) {
+    if (err) { console.log(err); return errorPage(res, err); }
+    if (ctrl && ctrl.matchingLocked === true) {
+      return Student.findOne({email:userEmail}, function(err, foundUser){
+        if (err) { console.log(err); return errorPage(res, err); }
+        Slot.find(function(err, slots){
+          if (err) { console.log(err); return errorPage(res, err); }
+          const array = setDisplayValues(slots);
+          return res.render("home", {
+            user: foundUser,
+            slots: array,
+            controls: ctrl,
+            maxSlots: (ctrl && ctrl.maxSlots) || maxSlots,
+            errM: "Matching is currently locked. You can’t remove or add slots right now."
           });
-        }
+        });
       });
     }
+
+    // proceed with normal unclaim
+    Slot.updateOne({_id:slotId},{studentName:"", studentEmail:""}, function(err){
+      if(err){
+        console.log(err);
+        return errorPage(res, err);
+      }
+      Student.findOne({email:userEmail},function(err,foundUser){
+        if(err){ console.log(err); return errorPage(res, err); }
+        Slot.find(function(err,slots){
+          if(err){ console.log(err); return errorPage(res, err); }
+          const array = setDisplayValues(slots);
+          makeLog("Unclaim", userEmail, slotId, slotId);
+          res.render("home", {
+            user:foundUser,
+            slots:array,
+            controls: ctrl,
+            maxSlots: (ctrl && ctrl.maxSlots) || maxSlots,
+            errM:"Successfully removed slot."
+          });
+        });
+      });
+    });
   });
 });
 
-app.post("/confirm", function(req,res){
-  const userEmail = _.toLower(req.body.userEmail);
-  Confirm.updateOne({email:userEmail},{confirmed:true}, function(err){
-    if(err){
-      console.log(err);
-      errorPage(res, err);
-    } else {
-      Student.findOne({email:userEmail},function(err,foundUser){
-        if(err){
-          console.log(err);
-          errorPage(res, err);
-        } else {
-          Slot.find(function(err,slots){
-            if(err){
-              console.log(err);
-              errorPage(res, err);
-            } else {
-              const array = setDisplayValues(slots);
-              // makeLog("Confirm", userEmail, slotId, slotId);
-              res.render("home", {user:foundUser, slots:array, controls:res.locals.controls, maxSlots:(res.locals.controls && res.locals.controls.maxSlots) || maxSlots, errM:"Successfully confirmed your slots."});
-            }
-          });
-        }
-      });
-    }
-  });
-});
 
 app.post("/admin-newAccounts", function(req,res){
   const uploadUserArray = req.body.uploadUsers;
@@ -673,26 +668,38 @@ app.post("/admin-newAccounts", function(req,res){
 
 app.post("/admin-matchSettings", function(req, res) {
   const maxSlots = parseInt(req.body.maxSlots);
-  const lockValue = req.body.matchingLock === "true"; // convert string to boolean
+  const lockValue = req.body.matchingLock === "true";
 
-  // Keep your group checkbox handling
-  var checkedBoxes = [];
+  // keep your group checkbox handling
   for (let i = 0; i < allGroups.length; i++) {
     const box = req.body[allGroups[i][0]];
     allGroups[i][1] = !!box;
   }
   console.log(allGroups);
 
-  // NEW: Persist lock state to all students in DB
-  Student.updateMany({}, { matchingLocked: lockValue }, function(err, result) {
-    if (err) {
-      console.error("Error updating students:", err);
-    } else {
-      console.log(`Updated ${result.modifiedCount} students to matchingLocked=${lockValue}`);
+  Control.updateOne(
+    { id: 1 },
+    { $set: { matchingLocked: lockValue, maxSlots: maxSlots } },
+    { upsert: true },
+    function(err) {
+      if (err) {
+        console.error("Error updating Control:", err);
+        return res.redirect("/");
+      }
+
+      // (Optional) mirror to students if you still want that
+      Student.updateMany({}, { matchingLocked: lockValue }, function(err, result) {
+        if (err) {
+          console.error("Error updating students:", err);
+        } else {
+          console.log(`Updated ${result.modifiedCount} students to matchingLocked=${lockValue}`);
+        }
+        return res.redirect("/");
+      });
     }
-    res.redirect("/");
-  });
+  );
 });
+
 
 // app.post("/admin-emails", function(req,res){
 //   var data = "";
