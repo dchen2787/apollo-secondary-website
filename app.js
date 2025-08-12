@@ -293,16 +293,29 @@ app.post("/claim", function(req,res){
   });
 });
 
-// Unclaim slot (ALLOWED even when locked)
-app.post("/unclaim", function(req,res){
+// Unclaim slot (ALLOWED even when locked, UNLESS already confirmed)
+app.post("/unclaim", async function(req, res) {
   const slotId = req.body.slotId;
   const userEmail = _.toLower(req.body.userEmail);
 
-  Slot.updateOne({_id:slotId},{studentName:"", studentEmail:""}, function(err){
-    if (err) return errorPage(res, err);
+  try {
+    // Check if user has confirmed
+    const confirmDoc = await Confirm.findOne({ email: userEmail }).lean();
+    if (confirmDoc && confirmDoc.confirmed) {
+      return renderHome(res, userEmail, "You have already confirmed your slots. You can no longer remove them.");
+    }
+
+    // Proceed with removal
+    await Slot.updateOne(
+      { _id: slotId },
+      { studentName: "", studentEmail: "" }
+    );
+
     makeLog("Unclaim", userEmail, slotId, slotId);
     return renderHome(res, userEmail, "Successfully removed slot.");
-  });
+  } catch (err) {
+    return errorPage(res, err);
+  }
 });
 
 // Confirm slots
