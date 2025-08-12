@@ -32,9 +32,9 @@ const Admin = mongoose.model("Admin", adminSchema);
 const slotSchema = new mongoose.Schema({
   physName: String,
   date: Date,
-  timeStart: String,
+  timeStart: String,     // e.g., "9:00 AM"
   physSpecialty: String,
-  timeEnd: String,
+  timeEnd: String,       // e.g., "11:30 AM"
   location: String,
   notes: String,
   testId: String,
@@ -47,8 +47,16 @@ const slotSchema = new mongoose.Schema({
 const Slot = mongoose.model("Slot", slotSchema);
 
 const studentSchema = new mongoose.Schema({
-  fName: String, lName: String, password: String, email: String,
-  appId: String, group: String, matchingLocked: Boolean,
+  fName: String,
+  lName: String,
+  password: String,
+  email: String,
+  appId: String,
+  group: String,
+  matchingLocked: Boolean,
+  // NEW
+  isLyte: { type: Boolean, default: false },
+  school: { type: String, default: "" }
 });
 const Student = mongoose.model("Student", studentSchema);
 
@@ -93,14 +101,46 @@ function makeLog(type, user, update, slotId) {
   });
 }
 
+function parseTimeToMinutes(t) {
+  if (!t || typeof t !== 'string') return null;
+  let s = t.trim().toLowerCase();
+  s = s.replace(/\s+/g, ''); // "9:00am" or "13:15"
+  // Detect am/pm
+  let ampm = null;
+  if (s.endsWith('am')) { ampm = 'am'; s = s.slice(0, -2); }
+  if (s.endsWith('pm')) { ampm = 'pm'; s = s.slice(0, -2); }
+
+  const parts = s.split(':');
+  if (parts.length < 1 || parts.length > 2) return null;
+  let h = parseInt(parts[0], 10);
+  let m = parts.length === 2 ? parseInt(parts[1], 10) : 0;
+  if (Number.isNaN(h) || Number.isNaN(m)) return null;
+
+  if (ampm) {
+    // 12-hour to 24-hour
+    if (ampm === 'am') {
+      if (h === 12) h = 0;
+    } else {
+      // pm
+      if (h !== 12) h += 12;
+    }
+  }
+  // 24-hour assumed if no am/pm
+  return h * 60 + m;
+}
+
+function slotHours(slot) {
+  const start = parseTimeToMinutes(slot?.timeStart);
+  const end   = parseTimeToMinutes(slot?.timeEnd);
+  if (start == null || end == null) return 0;
+  const diffMin = Math.max(0, end - start);
+  return Math.round((diffMin / 60) * 100) / 100; // 2 decimals
+}
+
 function setDisplayValues(slots) {
   const list = Array.isArray(slots) ? slots : [];
-
   const normalized = list.map((s) => {
-    // Accept either a Mongoose doc or a plain object
     const obj = (s && typeof s.toObject === 'function') ? s.toObject() : (s || {});
-
-    // Safe date formatting
     let dDate = "";
     if (obj.date) {
       const dt = new Date(obj.date);
@@ -108,7 +148,6 @@ function setDisplayValues(slots) {
         dDate = `${months[dt.getMonth()]} ${dt.getDate()}, ${dt.getFullYear()}`;
       }
     }
-
     return {
       ...obj,
       dDate,
@@ -116,7 +155,6 @@ function setDisplayValues(slots) {
     };
   });
 
-  // Sort safely by date
   normalized.sort((a, b) => {
     const aT = a.date ? new Date(a.date).getTime() : 0;
     const bT = b.date ? new Date(b.date).getTime() : 0;
@@ -130,7 +168,7 @@ function errorPage(res, err) {
   return res.render("error", { errM: err?.message || String(err) });
 }
 
-// Load controls into res.locals for views
+// Load controls for views
 app.use(async (req, res, next) => {
   try {
     res.locals.controls = await Control.findOne({ id: 1 }).lean();
@@ -184,22 +222,71 @@ async function renderHome(res, userEmail, errM = "") {
   }
 }
 
+// Build admin analytics (per-student hours, by-school totals)
+function buildAdminAnalytics(allSlots, allStudents, lyteOnly = false) {
+  const byEmail = {};
+  allStudents.forEach(st => {
+    const email = (st.email || "").toLowerCase();
+    if (!email) return;
+    byEmail[email] = {
+      name: (st.fName ? st.fName : "") + (st.lName ? (" " + st.lName) : ""),
+      email,
+      school: st.school || "",
+      isLyte: !!st.isLyte,
+      hours: 0
+    };
+  });
+
+  (allSlots || []).forEach(slot => {
+    const email = (slot.studentEmail || "").toLowerCase();
+    if (!email || !byEmail[email]) return;
+    byEmail[email].hours += slotHours(slot);
+  });
+
+  let studentHours = Object.values(byEmail)
+    .map(s => ({ ...s, hours: Math.round(s.hours * 100) / 100 }))
+    .sort((a, b) => b.hours - a.hours);
+
+  if (lyteOnly) {
+    studentHours = studentHours.filter(s => s.isLyte);
+  }
+
+  const schoolTotals = {};
+  studentHours.forEach(s => {
+    const key = s.school || "(No school)";
+    schoolTotals[key] = (schoolTotals[key] || 0) + s.hours;
+  });
+
+  const hoursBySchool = Object.entries(schoolTotals)
+    .map(([school, hours]) => ({ school, hours: Math.round(hours * 100) / 100 }))
+    .sort((a, b) => b.hours - a.hours);
+
+  return { studentHours, hoursBySchool };
+}
+
 // Single place to render admin dashboard
-async function renderAdminHome(res, flashMsg = "") {
+async function renderAdminHome(res, flashMsg = "", lyteOnly = false) {
   try {
-    const [slots, confirms, ctrl] = await Promise.all([
+    const [slots, confirms, ctrl, students] = await Promise.all([
       Slot.find({}).lean(),
       Confirm.find({}).lean(),
-      Control.findOne({ id: 1 }).lean()
+      Control.findOne({ id: 1 }).lean(),
+      Student.find({}).lean()
     ]);
     const array = setDisplayValues(slots);
+
+    const { studentHours, hoursBySchool } = buildAdminAnalytics(slots, students, lyteOnly);
 
     res.render("admin-home", {
       slots: array,
       maxSlots: (ctrl && ctrl.maxSlots) || maxSlots,
       allGroups: allGroups.sort(),
       confirms,
-      errM: flashMsg || ""
+      errM: flashMsg || "",
+      // NEW for the admin view:
+      studentHours,
+      hoursBySchool,
+      lyteOnly // echo current filter so the UI can show it
     });
   } catch (e) {
     return errorPage(res, e);
@@ -212,7 +299,8 @@ app.get("/", function (req, res) {
   res.render("landing");
 });
 app.get("/admin", function (req, res) {
-  return renderAdminHome(res);
+  const lyteOnly = String(req.query.lyte || "").toLowerCase() === "true";
+  return renderAdminHome(res, "", lyteOnly);
 });
 app.get("/admin-login", function (req, res) {
   res.render("admin-login", { errM: "" });
@@ -357,21 +445,36 @@ app.post("/confirm", function (req, res) {
 });
 
 // POST — Admin: bulk create accounts (admins + students)
+// New format per line: email///password///group///isLyte///school
+// - isLyte: yes/no/true/false (optional; default false)
+// - school: free text (optional; default "")
 app.post("/admin-newAccounts", function (req, res) {
   const uploadUserArray = req.body.uploadUsers || "";
-  let users = uploadUserArray.split("###").map(x => x.split("///"));
+  const users = uploadUserArray
+    .split("###")
+    .map(x => x.split("///").map(p => (p || "").trim()))
+    .filter(parts => parts.filter(Boolean).length >= 2); // at least email & password
 
-  users.forEach(function (user) {
-    const email = user[0];
-    const password = user[1];
-    const group = user[2];
-    if (email && password && group) {
+  users.forEach((parts) => {
+    const email = parts[0];
+    const password = parts[1];
+    const group = parts[2] || "";
+    const isLyteRaw = (parts[3] || "").toLowerCase();
+    const school = parts[4] || "";
+
+    const isLyte = (isLyteRaw === "yes" || isLyteRaw === "true" || isLyteRaw === "y" || isLyteRaw === "1");
+
+    if (email && password) {
       bcrypt.hash(password, saltRounds, function (err, hashedPassword) {
         if (err) return;
         const newStudent = new Student({
-          email: _.toLower(email), password: hashedPassword, group
+          email: _.toLower(email),
+          password: hashedPassword,
+          group,
+          isLyte,
+          school
         });
-        newStudent.save(() => { });
+        newStudent.save(() => {});
       });
     }
   });
@@ -414,7 +517,6 @@ app.post("/admin-matchSettings", function (req, res) {
         console.error("Error updating Control:", err);
         return renderAdminHome(res, "Error updating match settings.");
       }
-      // Optional: mirror to students
       Student.updateMany({}, { matchingLocked: lockValue }, function () {
         return renderAdminHome(res, "Match settings updated.");
       });
