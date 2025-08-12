@@ -16,10 +16,11 @@
   .alert-success { background:#ecfdf5; color:#065f46; }
   .alert-warning { background:#fff7ed; color:#9a3412; }
   .alert .close { position:absolute; right:10px; top:8px; background:transparent; border:0; font-size:20px; line-height:1; color:inherit; opacity:.6; }
-  .controls { display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:center; background:#f9fafb; border:1px solid #e5e7eb; padding:14px; border-radius:12px; margin-bottom:20px; }
+  .controls-box { background:#f9fafb; padding:14px; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,0.06); display:flex; gap:14px; flex-wrap:wrap; justify-content:center; }
   .searchbar { border-radius:12px; border:1px solid #e5e7eb; padding:10px 12px; width:100%; max-width:420px; }
-  .dropdown .dropdown-menu { max-height:260px; overflow:auto; min-width:240px; }
+  .dropdown .dropdown-menu { max-height:260px; overflow:auto; }
   label.checkbox { display:flex; align-items:center; gap:8px; }
+  #specDropdown { min-width:240px; }
 </style>
 
 <div class="container">
@@ -33,6 +34,7 @@
 
   <% if (controls && controls.matchingLocked) { %>
     <div class="alert alert-warning">
+      Matching is currently locked. You can review your matches but cannot add new ones.  
       Your matches are locked at this time. If you have any questions or concerns, please contact apolloyimde@gmail.com.
       <button type="button" class="close" aria-label="Close">&times;</button>
     </div>
@@ -76,12 +78,8 @@
   <h2 style="margin:16px 0 8px;">Your Matches</h2>
   <%
     const mySlots = (slots || []).filter(s => s.studentEmail === user.email);
-    const PCPonly = !!(controls && controls.PCPonly);
-    const count = mySlots.length;
-  %>
-
-  <% if (mySlots.length === 0) { %>
-    <div class="muted" style="margin-bottom:12px;">You haven’t claimed any slots yet.</div>
+    if (mySlots.length === 0) { %>
+      <div class="muted" style="margin-bottom:12px;">You haven’t claimed any slots yet.</div>
   <% } %>
 
   <% mySlots.forEach(function(slot){
@@ -91,8 +89,9 @@
       <div class="head">
         <strong><%= slot.physName || '—' %></strong>
         <% if (slot.physSpecialty) { %><span class="badge-soft"><%= slot.physSpecialty %></span><% } %>
-        <% if (PCPonly && slot.physSpecialty && !isPCP) { %><span class="pill-nonpcp">Non-PCP</span><% } %>
-        <% if (PCPonly && slot.physSpecialty && isPCP) { %><span class="badge-soft">PCP</span><% } %>
+        <% if ((controls && controls.PCPonly) && !isPCP && slot.physSpecialty) { %>
+          <span class="pill-nonpcp">Non-PCP</span>
+        <% } %>
       </div>
       <div class="muted" style="margin:6px 0;">
         <strong><%= slot.dDate || '-' %></strong> • <%= (slot.timeStart || '-') %> to <%= (slot.timeEnd || '-') %> • <%= slot.location || '-' %>
@@ -111,10 +110,10 @@
     </div>
   <% }); %>
 
-  <!-- Claim phase rules -->
+  <!-- Phase messages & confirm instructions -->
   <% if (!(controls && controls.matchingLocked)) { %>
     <hr /><br />
-    <% if (count < maxSlots) { %>
+    <% if (mySlots.length < maxSlots) { %>
       <% if (controls && controls.PCPonly === true) { %>
         <h4>*PCP-only phase is active. You can browse all slots, but you may only claim Primary Care slots right now.</h4>
       <% } else if (maxSlots === 2) { %>
@@ -129,8 +128,8 @@
         <h4>*You have the maximum number of matches at this time. Your above matches are saved and Apollo will confirm your slots via email after the Match period.</h4>
       <% } %>
     <% } %>
-
-    <br /><br />
+  <% } else { %>
+    <hr /><br />
     <h5>
       To confirm that you are willing and able to attend all the slots above, press this button.  
       Please remember to check date and location information carefully.  
@@ -139,19 +138,19 @@
     </h5>
   <% } %>
 
-  <% const matchingLocked = !!(controls && controls.matchingLocked); %>
-
   <!-- Browse with filters: hidden if matching is locked -->
-  <% if (!matchingLocked) { %>
+  <% if (!(controls && controls.matchingLocked)) { %>
     <h2 style="margin:20px 0 8px;">Browse Slots</h2>
 
     <%
       const specsSet = new Set((slots || []).map(s => (s.physSpecialty || '').trim()).filter(Boolean));
       const specialties = Array.from(specsSet).sort();
+      const PCPonly = !!(controls && controls.PCPonly);
     %>
 
-    <div class="controls">
+    <div class="controls-box" style="margin-bottom:20px;">
       <input id="search" class="searchbar" placeholder="Search by physician, specialty, location, or notes…">
+
       <div class="dropdown">
         <button class="btn-ghost dropdown-toggle" type="button" id="specDropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
           Specialties (multi-select)
@@ -169,6 +168,7 @@
         </div>
         <div class="muted" id="specHint" style="font-size:12px; margin-top:2px;">All specialties selected</div>
       </div>
+
       <label class="checkbox">
         <input id="onlyOpen" type="checkbox" checked>
         <span>Only show not claimed</span>
@@ -188,8 +188,9 @@
           <div class="head">
             <strong><%= slot.physName || '—' %></strong>
             <% if (slot.physSpecialty) { %><span class="badge-soft"><%= slot.physSpecialty %></span><% } %>
-            <% if (PCPonly && slot.physSpecialty && !isPCP) { %><span class="pill-nonpcp">Non-PCP</span><% } %>
-            <% if (PCPonly && slot.physSpecialty && isPCP) { %><span class="badge-soft">PCP</span><% } %>
+            <% if ((controls && controls.PCPonly) && !isPCP && slot.physSpecialty) { %>
+              <span class="pill-nonpcp">Non-PCP</span>
+            <% } %>
           </div>
 
           <div class="muted" style="margin:6px 0;">
@@ -214,12 +215,7 @@
               <% } %>
             <% } else { %>
               <% if (slot.studentEmail === user.email) { %>
-                <form action="/unclaim" method="post" style="display:inline;">
-                  <input type="hidden" name="userEmail" value="<%= user.email %>">
-                  <input type="hidden" name="slotId" value="<%= slot._id %>">
-                  <button type="submit" class="btn-ghost">Remove</button>
-                </form>
-                <span class="muted" style="margin-left:8px;">Claimed by you</span>
+                <span class="muted">Claimed by you</span>
               <% } else { %>
                 <span class="muted">Taken</span>
               <% } %>
@@ -233,7 +229,6 @@
 </div>
 
 <script>
-  // Dismiss alerts with ×
   document.querySelectorAll('.alert .close').forEach(btn => {
     btn.addEventListener('click', () => btn.closest('.alert')?.remove());
   });
@@ -302,7 +297,9 @@
 <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
 <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
 <script>
- $(function () { $('#specDropdown').dropdown(); });
+ $(function () {
+   $('#specDropdown').dropdown();
+ });
 </script>
 
 <%- include("./partials/footer"); -%>
