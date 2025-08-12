@@ -278,8 +278,28 @@ function errorPage(res, err) {
 }
 
 //GET
-app.get("/", function(req,res){
-  res.render("landing");
+app.get("/", function(req, res) {
+    // Example flow:
+    Student.findOne({ email: req.user.email }, function(err, foundUser) {
+        if (err) { console.log(err); return; }
+
+        Slot.find({}, function(err, array) {
+            if (err) { console.log(err); return; }
+
+            Control.findOne({}, function(err, ctrl) {
+                if (err) { console.log(err); return; }
+
+                res.render("home", {
+                    user: foundUser,
+                    slots: array,
+                    controls: ctrl,
+                    maxSlots: (ctrl && ctrl.maxSlots) || maxSlots,
+                    errM: "",
+                    confirmed: false // default — you can replace with real value if you store it
+                });
+            });
+        });
+    });
 });
 app.get("/admin-login", function(req,res){
   res.render("admin-login", {errM:""});
