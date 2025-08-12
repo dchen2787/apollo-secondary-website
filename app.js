@@ -259,40 +259,36 @@ app.post("/admin-login", function(req, res) {
   });
 });
 
-// Claim slot (blocked if matchingLocked)
 app.post("/claim", function(req,res){
-  const userFName = req.body.userFName;
-  const userLName = req.body.userLName;
-  const userName  = `${userFName} ${userLName}`;
   const userEmail = _.toLower(req.body.userEmail);
   const slotId    = req.body.slotId;
 
   Control.findOne({ id: 1 }).lean().exec(function(err, ctrl) {
     if (err) return errorPage(res, err);
 
+    // Block adding if matching is locked
     if (ctrl && ctrl.matchingLocked === true) {
       return renderHome(res, userEmail, "Matching is currently locked. You can review/remove your matches but cannot add new ones.");
     }
 
-    Slot.findOne({_id:slotId}, function(err,thisSlot){
-      if(err || !thisSlot) return errorPage(res, err || "Slot not found.");
+    Slot.findOne({_id:slotId}, function(err, slot){
+      if (err || !slot) return errorPage(res, err || "Slot not found.");
 
-      // PCP-only guard
-      if (ctrl && ctrl.PCPonly === true && !isPCPSlot(thisSlot)) {
-        return renderHome(res, userEmail, "PCP-only is active. You can only claim primary‑care slots right now.");
-      }
-
-      // Already filled?
-      if (thisSlot.studentEmail && thisSlot.studentEmail.length > 0) {
+      // Already claimed
+      if (slot.studentEmail) {
         return renderHome(res, userEmail, "This slot was already claimed. Please reload to see the latest availability.");
       }
 
-      // Claim
-      Slot.updateOne({_id:slotId},{studentName:userName, studentEmail:userEmail}, function(err){
-        if(err) return errorPage(res, err);
-        makeLog("Claim slot", userEmail, slotId, slotId);
-        return renderHome(res, userEmail, "Successfully matched.");
-      });
+      // Claim it
+      Slot.updateOne(
+        { _id: slotId },
+        { studentName: `${req.body.userFName} ${req.body.userLName}`, studentEmail: userEmail },
+        function(err){
+          if (err) return errorPage(res, err);
+          makeLog("Claim slot", userEmail, slotId, slotId);
+          return renderHome(res, userEmail, "Successfully matched.");
+        }
+      );
     });
   });
 });
@@ -303,16 +299,15 @@ app.post("/unclaim", function(req,res){
   const userEmail = _.toLower(req.body.userEmail);
 
   Slot.updateOne({_id:slotId},{studentName:"", studentEmail:""}, function(err){
-    if(err) return errorPage(res, err);
+    if (err) return errorPage(res, err);
     makeLog("Unclaim", userEmail, slotId, slotId);
     return renderHome(res, userEmail, "Successfully removed slot.");
   });
 });
 
-// Confirm (sets confirmed flag, greys out button on home)
+// Confirm slots
 app.post("/confirm", function(req, res) {
   const userEmail = _.toLower(req.body.userEmail);
-
   Confirm.updateOne(
     { email: userEmail },
     { $set: { confirmed: true } },
