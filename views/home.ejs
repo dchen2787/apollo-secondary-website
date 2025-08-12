@@ -1,362 +1,204 @@
 <%- include("./partials/header"); -%>
-<div id="view-shadow-slots">
-<% const isConfirmed = (typeof confirmed !== 'undefined' && confirmed); %>
-<% if(errM){%>
-   <div class="alert alert-success">
-     <h6 class="mb-0"><%=errM%>
-       <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-         <span aria-hidden="true">&times;</span>
-       </button>
-     </h6>
-   </div>
- <%}%>
-<% if (controls && controls.matchingLocked === true) { %>
- <h1>Your Matches</h1>
- <% var count = 0 %>
- <% slots.forEach(function(slot){ %>
-   <% if(slot.studentEmail && slot.studentEmail == user.email){%>
-     <% count++; %>
-     <hr />
-     <div class="row">
-        <div class="col-12 col-md-9">
-         <%= slot.physName %>, <%=slot.physSpecialty %> <br />
-         <%= slot.dDate %>, <%= slot.timeStart %> to <%= slot.timeEnd %> <br />
-         <%= slot.location %> <br />
-         <% if(slot.notes){ %>
-          <p class="italics">  Notes: <%= slot.notes %><br /></p>
-         <% }%>
-       </div>
-       <% if (!isConfirmed) { %>
-          <div class="col-12 col-md-3">
-            <form action="/unclaim" method="post">
-              <input type="hidden" name="userEmail" value="<%=user.email%>">
-              <input type="hidden" name="slotId" value="<%=slot._id%>">
-              <br/>
-              <button type="submit" name="button" class="btn">Remove</button>
-            </form>
-          </div>
+
+<div id="view-shadow-slots" class="container">
+  <h1>Admin Dashboard</h1>
+
+  <% if (errM && errM.length) { %>
+    <div class="alert alert-info" style="margin: 8px 0;"><%= errM %></div>
+  <% } %>
+
+  <hr />
+
+  <!-- ==================== CREATE ACCOUNTS ==================== -->
+  <h2>Create Accounts</h2>
+  <form action="/admin-newAccounts" method="post">
+    <h4>New Student Users</h4>
+    <p class="text-muted" style="margin-top:-6px;">
+      Format per student (use <strong>###</strong> between multiple students):<br/>
+      <code>email///password///group///isLyte///school</code><br/>
+      Examples:<br/>
+      <code>jane@x.com///pw123///2024///yes///Roosevelt HS###john@y.com///pw456///2025///no///Jefferson HS</code>
+    </p>
+    <input type="text" name="uploadUsers" class="form-control" placeholder="Paste students here">
+    <br/>
+    <h4>New Admins</h4>
+    <p class="text-muted" style="margin-top:-6px;">
+      Format per admin (use <strong>###</strong> between multiple admins):<br/>
+      <code>First///Last///email///password</code>
+    </p>
+    <input type="text" name="uploadAdmins" class="form-control" placeholder="Paste admins here">
+    <br/>
+    <button type="submit" class="btn">Create</button>
+  </form>
+
+  <br/><hr/>
+
+  <!-- ==================== CSV EXPORTS ==================== -->
+  <h2>Exports</h2>
+  <div style="margin: 12px 0;">
+    <a class="btn" href="/admin/export/students.csv">Download Students CSV (All)</a>
+    <a class="btn" href="/admin/export/students.csv?lyte=1">Download Students CSV (LYTE only)</a>
+    <a class="btn" href="/admin/export/slots.csv">Download Slots CSV</a>
+  </div>
+
+  <!-- School-filtered students CSV -->
+  <form action="/admin/export/students.csv" method="get" class="form-inline" style="margin: 8px 0;">
+    <label for="schoolCsv" style="margin-right:8px;">Students CSV filtered by school:</label>
+    <input id="schoolCsv" class="form-control" type="text" name="school" placeholder="Exact school name">
+    <button class="btn" type="submit" style="margin-left:8px;">Download</button>
+  </form>
+
+  <br/><hr/>
+
+  <!-- ==================== STUDENT HOURS + FILTERS ==================== -->
+  <div class="d-flex" style="gap:10px; align-items:center; flex-wrap:wrap;">
+    <h2 style="margin: 0;">Student Hours</h2>
+    <% if (lyteOnly) { %>
+      <a href="/admin" class="btn btn-light">Show all students</a>
+      <span class="badge badge-info">LYTE filter is ON</span>
+    <% } else { %>
+      <a href="/admin?lyte=true" class="btn btn-light">Show LYTE only</a>
+    <% } %>
+  </div>
+
+  <div class="row font-weight-bold" style="margin-top:10px;">
+    <div class="col-12 col-md-4">Student</div>
+    <div class="col-12 col-md-3">Email</div>
+    <div class="col-12 col-md-3">School</div>
+    <div class="col-12 col-md-2">Hours</div>
+  </div>
+  <hr/>
+  <% (studentHours || []).forEach(function(s){ %>
+    <div class="row">
+      <div class="col-12 col-md-4">
+        <%= s.name || "(no name)" %> <%= s.isLyte ? "• LYTE" : "" %>
+      </div>
+      <div class="col-12 col-md-3"><%= s.email %></div>
+      <div class="col-12 col-md-3"><%= s.school || "(No school)" %></div>
+      <div class="col-12 col-md-2"><%= s.hours.toFixed(2) %></div>
+    </div>
+    <hr/>
+  <% }) %>
+
+  <h2>Hours by School</h2>
+  <div class="row font-weight-bold">
+    <div class="col-12 col-md-8">School</div>
+    <div class="col-12 col-md-4">Total Hours</div>
+  </div>
+  <hr/>
+  <% (hoursBySchool || []).forEach(function(r){ %>
+    <div class="row">
+      <div class="col-12 col-md-8"><%= r.school %></div>
+      <div class="col-12 col-md-4"><%= r.hours.toFixed(2) %></div>
+    </div>
+    <hr/>
+  <% }) %>
+
+  <br/><hr/>
+
+  <!-- ==================== MATCH SETTINGS ==================== -->
+  <h2>Match Settings</h2>
+  <form action="/admin-matchSettings" method="post">
+    <div class="form-group">
+      <label>Max Slots Per Student:</label>
+      <input type="number" name="maxSlots" value="<%= maxSlots %>" class="form-control" style="max-width:200px;">
+    </div>
+
+    <div class="form-group" style="margin-top:10px;">
+      <label>Matching Lock:</label><br/>
+      <label style="margin-right:10px;">
+        <input type="radio" name="matchingLock" value="true"> Locked (no new claims)
+      </label>
+      <label>
+        <input type="radio" name="matchingLock" value="false" checked> Unlocked
+      </label>
+    </div>
+
+    <div style="margin-top:12px;">
+      <label>Matching allowed for (Year/session joined, grad year)</label><br/>
+      <% for (let i = 0; i < allGroups.length; i++) { %>
+        <% var boxStatus = allGroups[i][1] ? "checked" : ""; %>
+        <input type="checkbox" name="<%= allGroups[i][0] %>" <%= boxStatus %>>
+        <%= allGroups[i][0] %><br/>
       <% } %>
-     </div>
-   <% } %>
+    </div>
 
- <% }) %>
- <hr />
- <br /><br />
+    <button type="submit" class="btn" style="margin-top:12px;">Update Access</button>
+  </form>
 
- <h5>To confirm that you are willing and able to attend all the slots above, press this button. Please remember to check date and location information carefully. If you are unable to attend any of the slots above or have any questions about your slots, instead contact the Apollo Team via email immediately. </h5>
- <br /> 
+  <br/><hr/>
 
- <!-- future todo: make confirm form disappear after student has confirmed once ( done :) ) --> 
- <% if (isConfirmed) { %>
-   <p>I can attend all slots listed above:</p>
-   <button type="button" class="btn" disabled>Slots confirmed</button>
- <% } else { %>
-   <form action="/confirm" method="post">
-     <input type="hidden" name="userEmail" value="<%=user.email%>">
-     <p>I can attend all slots listed above:</p>
-     <button type="submit" name="button" class="btn">Confirm</button>
-   </form>
- <% } %>
- 
- <!-- <h4>Your matches are locked at this time. If you have any questions or concerns, please contact apolloyimde@gmail.com.</h4> -->
+  <!-- ==================== CONFIRM CONTROLS ==================== -->
+  <h2>Confirm Controls</h2>
+  <form action="/admin-reset-confirms" method="post"
+        onsubmit="return confirm('Reset ALL confirmations for everyone? This cannot be undone.');"
+        style="margin-bottom:16px;">
+    <button type="submit" class="btn btn-danger">Reset All Confirmations (only at end of session)</button>
+  </form>
 
+  <h3>Confirm Status</h3>
+  <!-- future todo: show only students who have 1+ slot -->
+  <% (confirms || []).forEach(function(confirm){ %>
+    <div class="row" style="align-items:center;">
+      <div class="col col-5"><%= confirm.email %></div>
+      <div class="col col-3">
+        <%= confirm.confirmed ? "true" : (typeof confirm.confirmed === "undefined" ? "-" : "false") %>
+      </div>
+      <div class="col col-4">
+        <form action="/admin-clear-confirm" method="post" style="display:inline;">
+          <input type="hidden" name="email" value="<%= confirm.email %>">
+          <button type="submit" class="btn btn-light"
+                  onclick="return confirm('Clear confirmation for <%= confirm.email %>?');">
+            Clear
+          </button>
+        </form>
+      </div>
+    </div>
+    <hr/>
+  <% }); %>
 
-<% } else { %>
-<h1>Your Matches</h1>
-<% var count = 0 %>
-<% slots.forEach(function(slot){ %>
- <% if(slot.studentEmail && slot.studentEmail == user.email){%>
-   <% count++; %>
-   <hr />
-   <div class="row">
-     <div class="col-12 col-md-9">
-       <%= slot.physName %>, <%=slot.physSpecialty %> <br />
-       <%= slot.dDate %>, <%= slot.timeStart %> to <%= slot.timeEnd %> <br />
-       <%= slot.location %> <br />
-       <% if(slot.notes){ %>
-       <p class="italics">  Notes: <%= slot.notes %><br /></p>
-       <% }%>
-     </div>
-     <div class="col-12 col-md-3">
-       <form action="/unclaim" method="post">
-         <input type="hidden" name="userEmail" value="<%=user.email%>">
-         <input type="hidden" name="slotId" value="<%=slot._id%>">
-         <br/>
-         <button type="submit" name="button" class="btn">Remove</button>
-       </form>
-     </div>
-   </div>
- <% } %>
+  <br/>
 
-<% }) %>
-<hr /><br />
-<% if (count < maxSlots) { %>
- <% if (controls && controls.PCPonly === true) { %>
-   <h4>*PCP-only phase is active. You can browse all slots, but you may only claim Primary Care slots right now.</h4>
- <% } else if (maxSlots === 2) { %>
-   <h4>*You may claim up to 2 slots for this phase of the Match. Any matches listed above are saved and Apollo will confirm your slots via email after the Match period.</h4>
- <% } else { %>
-   <h4>*You may claim an unlimited number of slots at this time. Any matches listed above are saved and Apollo will confirm your slots via email after the Match period.</h4>
- <% } %>
-<% } else { %>
- <% if (maxSlots === 2) { %>
-   <h4>*You have reached the maximum of 2 slots for this phase of the Match.</h4>
- <% } else { %>
-   <h4>*You have the maximum number of matches at this time. Your above matches are saved and Apollo will confirm your slots via email after the Match period.</h4>
- <% } %>
-<% } %>
-<br /><br /><br /><br />
+  <!-- ==================== SHADOW SLOTS ==================== -->
+  <h2 id="shadow-slots-head">Shadow Slots</h2>
+  <div class="row font-weight-bold">
+    <div class="col col-12 col-lg-2">Physician</div>
+    <div class="col col-12 col-lg-2">Date</div>
+    <div class="col col-12 col-lg-2">Time</div>
+    <div class="col col-12 col-lg-2">Location</div>
+    <div class="col col-12 col-lg-2">Notes</div>
+    <div class="col col-12 col-lg-2">Matched?</div>
+  </div>
+  <hr>
 
-<%
- // sorted list of specialties from the slots rendered
- var specialties = [];
- slots.forEach(function(s){
-   if (s.physSpecialty) {
-     const spec = (s.physSpecialty || '').trim();
-     if (specialties.indexOf(spec) === -1) specialties.push(spec);
-   }
- });
- specialties.sort();
-%>
+  <% (slots || []).forEach(function(slot){ %>
+    <div class="row">
+      <div class="col col-12 col-lg-2">
+        <%= slot.physName || '-' %><%= (slot.physSpecialty ? ', ' + slot.physSpecialty : '') %>
+      </div>
+      <div class="col col-12 col-lg-2">
+        <%= slot.dDate || '-' %>
+      </div>
+      <div class="col col-12 col-lg-2">
+        <%= (slot.timeStart || '-') %> to <%= (slot.timeEnd || '-') %>
+      </div>
+      <div class="col col-12 col-lg-2">
+        <%= slot.location || '-' %>
+      </div>
+      <div class="col col-12 col-lg-2">
+        <%= (slot.notes && slot.notes.trim()) ? slot.notes : '-' %>
+      </div>
+      <div class="col col-12 col-lg-2">
+        <% if (slot.studentEmail && slot.studentEmail.length) { %>
+          <%= (slot.studentName || '') %><%= slot.studentName ? ' , ' : '' %><%= slot.studentEmail %>
+        <% } else { %>
+          -
+        <% } %>
+      </div>
+    </div>
+    <hr />
+  <% }); %>
 
-<% if (!(controls && controls.matchingLocked)) { %>
+</div>
 
- <h1>Shadow Slots</h1><br/>
- <!-- Filter Bar -->
- <div style="margin: 0.5rem 0 1rem; padding: 0.75rem; background: #f8f8f8; border: 1px solid #ccc; border-radius:6px;">
-   <div class="row">
-     <div class="col-12 col-md-4" style="margin-bottom:.5rem;">
-       <input id="slotSearch" class="form-control" placeholder="Search by physician or specialty">
-     </div>
- 
-     <div class="col-12 col-md-5" style="margin-bottom:.5rem;">
-       <div class="dropdown">
-         <button class="btn btn-light dropdown-toggle w-100" type="button" id="specDropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-           Specialties (multi-select)
-         </button>
-         <div class="dropdown-menu w-100 p-2" aria-labelledby="specDropdown" style="max-height: 260px; overflow:auto;">
-           <label class="dropdown-item mb-1">
-             <input type="checkbox" id="specAll" checked> <strong>All specialties</strong>
-           </label>
-           <div class="dropdown-divider"></div>
-           <% specialties.forEach(function(spec){ %>
-             <label class="dropdown-item mb-1">
-               <input type="checkbox" class="spec-option" value="<%= spec %>">
-               <span><%= spec %></span>
-             </label>
-           <% }) %>
-         </div>
-       </div>
-       <small id="specCountHint" style="opacity:.7; display:block; margin-top:.25rem;">All specialties selected</small>
-     </div>
- 
-     <div class="col-6 col-md-2 d-flex align-items-center" style="margin-bottom:.5rem;">
-       <label class="mb-0">
-         <input id="onlyUnclaimed" type="checkbox" style="margin-right:6px;">
-         Only show unmatched slots
-       </label>
-     </div>
- 
-     <div class="col-6 col-md-1 d-flex align-items-center" style="margin-bottom:.5rem;">
-       <button id="resetFilters" type="button" class="btn btn-light w-100">Reset</button>
-     </div>
-   </div>
- </div>
- 
- <!-- End -->
- <% const pcpOnly = controls && controls.PCPonly === true; %>
- 
- <!-- <p>Please remember, all slots currently listed below fall under the category of Primary Care. More specialty slots will be available starting Wednesday, 10/20.</p><br/><br/> -->
- <!-- <div class="container"> -->
-   <div class="row chart-titles">
-     <div class="col col-12 col-lg-2">
-       Physician
-     </div>
-     <div class="col col-12 col-lg-2">
-       Date
-     </div>
-     <div class="col col-12 col-lg-2">
-       Time
-     </div>
-     <div class="col col-12 col-lg-2">
-       Location
-     </div>
-     <div class="col col-12 col-lg-2">
-       Notes
-     </div>
-     <div class="col col-12 col-lg-2">
-       Matched?
-     </div>
-   </div>
- <hr>
- <% slots.forEach(function(slot){ %>
-   <!-- !controls.PCPonly ||  -->
-   <!-- slot.physSpecialty.includes("Primary Care") -->
-   <% if(true){%>
- 
- <div class="slot-row"
-      data-phys="<%= (slot.physName || '').toLowerCase() %>"
-      data-spec="<%= (slot.physSpecialty || '').toLowerCase() %>"
-      data-filled="<%= (slot.studentEmail && slot.studentEmail.length>0) ? 'true' : 'false' %>">
- 
-   <div class="row">
-     <div class="col col-12 col-lg-2">
-       <%= slot.physName %>, <%=slot.physSpecialty %>
-     </div>
-     <div class="col col-12 col-lg-2"><%= slot.dDate %></div>
-     <div class="col col-12 col-lg-2"><%= slot.timeStart %> to <%= slot.timeEnd %></div>
-     <div class="col col-12 col-lg-2"><%= slot.location %></div>
-     <div class="col col-12 col-lg-2"><%= slot.notes %></div>
-     <div class="col col-12 col-lg-2">
-       <% var btnProp = null; %>
-       <% count >= maxSlots ? btnProp = "disabled" : null %>
- 
-       <% if (slot.studentEmail && slot.studentEmail.length>0) { %>
-         <p class="italics">Filled</p>
-       <% } else { %>
-         <% if (pcpOnly && !slot.isPCP) { %>
-           <button class="btn" disabled title="PCP-only Phase">Match</button>
-           <small style="opacity:.7; margin-left:.5rem;">(PCP-only active)</small>
-         <% } else { %>
-           <form action="/claim" method="post">
-             <input type="hidden" name="userFName" value="<%=user.fName%>">
-             <input type="hidden" name="userLName" value="<%=user.lName%>">
-             <input type="hidden" name="userEmail" value="<%=user.email%>">
-             <input type="hidden" name="slotId" value="<%=slot._id%>">
-             <button type="submit" name="button" class="btn <%=btnProp%>" <%=btnProp%>>Match</button>
-           </form>
-         <% } %>
-       <% } %>
-     </div>
-   </div>
- 
-   <hr />
- </div>
- 
- 
- <% }}) %>
- <%  } %>
-<% } %>
-
- </div>
-
-
-<!-- filter logic -->
-<script>
-(function(){
- const q  = s => document.querySelector(s);
- const qa = s => Array.from(document.querySelectorAll(s));
-
- // inputs
- const search     = q('#slotSearch');
- const unclaimed  = q('#onlyUnclaimed');
- const resetBtn   = q('#resetFilters');
-
- // specialty dropdown
- const specAll    = q('#specAll');
- const specChecks = qa('.spec-option');
- const specHint   = q('#specCountHint');
-
- // rows
- const rows = qa('.slot-row');
-
- // keep dropdown open when clicking inside
- document.querySelectorAll('.dropdown-menu').forEach(menu => {
-   menu.addEventListener('click', e => e.stopPropagation());
- });
-
- function selectedSpecsLower() {
-   const picked = specChecks.filter(c => c.checked).map(c => (c.value || '').toLowerCase());
-   return picked;
- }
-
- function updateSpecHint() {
-   const picked = specChecks.filter(c => c.checked).length;
-   if (specAll.checked || picked === 0 || picked === specChecks.length) {
-     specHint.textContent = 'All specialties selected';
-   } else {
-     specHint.textContent = picked + ' specialty(ies) selected';
-   }
- }
-
- function applyFilters() {
-   const term = (search?.value || '').trim().toLowerCase();
-   const wantOnlyUnclaimed = !!(unclaimed && unclaimed.checked);
-   const pickedSpecs = specAll && specAll.checked ? [] : selectedSpecsLower(); // empty => all
-
-   rows.forEach(row => {
-     const name = row.dataset.phys || '';
-     const spec = row.dataset.spec || '';
-     const isFilled = row.dataset.filled === 'true';
-
-     let ok = true;
-
-     // text search
-     if (term) {
-       ok = name.includes(term) || spec.includes(term);
-     }
-
-     // specialties (if any picked)
-     if (ok && pickedSpecs.length > 0) {
-       ok = pickedSpecs.includes(spec);
-     }
-
-     // only unclaimed
-     if (ok && wantOnlyUnclaimed) {
-       ok = !isFilled;
-     }
-
-     row.style.display = ok ? '' : 'none';
-   });
- }
-
- // wire up events
- search?.addEventListener('input', applyFilters);
- unclaimed?.addEventListener('change', applyFilters);
-
- // spec "All" checkbox behavior
- specAll?.addEventListener('change', () => {
-   if (specAll.checked) {
-     specChecks.forEach(c => c.checked = false);
-   }
-   updateSpecHint();
-   applyFilters();
- });
-
- // individual spec checkboxes
- specChecks.forEach(c => {
-   c.addEventListener('change', () => {
-     if (specChecks.some(x => x.checked)) {
-       specAll.checked = false;
-     } else {
-       specAll.checked = true;
-     }
-     updateSpecHint();
-     applyFilters();
-   });
- });
-
- // reset button
- resetBtn?.addEventListener('click', () => {
-   if (search) search.value = '';
-   if (unclaimed) unclaimed.checked = false;
-   if (specAll) specAll.checked = true;
-   specChecks.forEach(c => c.checked = false);
-   updateSpecHint();
-   applyFilters();
- });
-
- // initial render
- updateSpecHint();
- applyFilters();
-})();
-</script>
-<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
-<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
-<script>
- $(function () {
-   $('#specDropdown').dropdown(); // initialize BS4 dropdown
- });
-</script>
 <%- include("./partials/footer"); -%>
