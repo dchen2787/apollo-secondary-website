@@ -18,12 +18,12 @@
       <% count++; %>
       <hr />
       <div class="row">
-        <div class="col col-lg-12">
+        <div class="col-12 col-md-9">
           <%= slot.physName %>, <%=slot.physSpecialty %> <br />
           <%= slot.dDate %>, <%= slot.timeStart %> to <%= slot.timeEnd %> <br />
           <%= slot.location %> <br />
           <% if(slot.notes){ %>
-          <p class="italics">  Notes: <%= slot.notes %><br /></p>
+          <p class="italics">Notes: <%= slot.notes %><br /></p>
           <% }%>
         </div>
         <div class="col-12 col-md-3">
