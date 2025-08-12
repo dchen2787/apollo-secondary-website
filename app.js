@@ -1,18 +1,21 @@
 // app.js
-const express = require('express');
-const ejs = require('ejs');
+const express  = require('express');
+const ejs      = require('ejs');
 const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
-const _ = require('lodash');
-const bcrypt = require('bcrypt');
+const _        = require('lodash');
+const bcrypt   = require('bcrypt');
 
 const saltRounds = 10;
-const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const months = [
+  "January","February","March","April","May","June",
+  "July","August","September","October","November","December"
+];
 
 const app = express();
 app.use(express.static('public'));
 app.set('view engine', 'ejs');
-app.use(bodyParser.urlencoded({extended:true}));
+app.use(bodyParser.urlencoded({ extended: true }));
 
 // ---- DB ----
 mongoose.connect(
@@ -22,7 +25,7 @@ mongoose.connect(
 
 // ---- Schemas / Models ----
 const adminSchema = new mongoose.Schema({
-  fName:String, lName:String, password:String, email:String, permissions:Array
+  fName: String, lName: String, password: String, email: String, permissions: Array
 });
 const Admin = mongoose.model("Admin", adminSchema);
 
@@ -30,22 +33,22 @@ const slotSchema = new mongoose.Schema({
   physName: String,
   date: Date,
   timeStart: String,
-  physSpecialty:String,
+  physSpecialty: String,
   timeEnd: String,
-  location:String,
-  notes:String,
-  testId:String,
-  studentName:String,
-  studentEmail:String,
-  dDate:String,
-  dTime:String,
+  location: String,
+  notes: String,
+  testId: String,
+  studentName: String,
+  studentEmail: String,
+  dDate: String,
+  dTime: String,
   filled: Boolean
 });
 const Slot = mongoose.model("Slot", slotSchema);
 
 const studentSchema = new mongoose.Schema({
-  fName:String, lName:String, password:String, email:String, appId:String,
-  group:String, matchingLocked: Boolean,
+  fName: String, lName: String, password: String, email: String,
+  appId: String, group: String, matchingLocked: Boolean,
 });
 const Student = mongoose.model("Student", studentSchema);
 
@@ -64,34 +67,33 @@ const controlSchema = new mongoose.Schema({
 const Control = mongoose.model("Control", controlSchema);
 
 const logSchema = new mongoose.Schema({
-  time:String, type:String, user:String, update:String, slot: String
+  time: String, type: String, user: String, update: String, slot: String
 });
 const Log = mongoose.model("Log", logSchema);
 
 // ---- Helpers ----
-const ALLOWED_PCP = new Set([
-  "Family Medicine (PCP)",
-  "Primary Care",
-]);
+const ALLOWED_PCP = new Set(["Family Medicine (PCP)", "Primary Care"]);
 function isPCPSlot(slot) {
-  return ALLOWED_PCP.has((slot.physSpecialty || "").trim());
+  return ALLOWED_PCP.has((slot?.physSpecialty || "").trim());
 }
 
-function makeLog(type, user, update, slotId){
+function makeLog(type, user, update, slotId) {
   const date = new Date();
   if (!slotId || slotId === " ") return;
-  Slot.findOne({_id:slotId}, function(err, foundSlot){
+  Slot.findOne({ _id: slotId }, function (err, foundSlot) {
     if (err || !foundSlot) return;
-    const newLog = new Log ({
-      time: (1+date.getMonth())+"/"+date.getDate()+" "+date.getHours()+":"+date.getMinutes()+":"+date.getSeconds(),
-      type, user, update, // activated email or slotid
+    const newLog = new Log({
+      time:
+        (1 + date.getMonth()) + "/" + date.getDate() + " " +
+        date.getHours() + ":" + date.getMinutes() + ":" + date.getSeconds(),
+      type, user, update,
       slot: `${foundSlot.physName} ${foundSlot.timeStart} ${foundSlot.date}`
     });
-    newLog.save(()=>{});
+    newLog.save(() => {});
   });
 }
 
-function setDisplayValues(slots){
+function setDisplayValues(slots) {
   const list = Array.isArray(slots) ? slots : [];
 
   const normalized = list.map((s) => {
@@ -128,7 +130,7 @@ function errorPage(res, err) {
   return res.render("error", { errM: err?.message || String(err) });
 }
 
-// load controls into res.locals if needed elsewhere
+// Load controls into res.locals for views
 app.use(async (req, res, next) => {
   try {
     res.locals.controls = await Control.findOne({ id: 1 }).lean();
@@ -141,8 +143,8 @@ app.use(async (req, res, next) => {
 
 let maxSlots = 100;
 let allGroups = [];
-function updateGroups(){
-  Student.find(function(err, students){
+function updateGroups() {
+  Student.find(function (err, students) {
     if (err) return;
     const seen = new Set(allGroups.map(g => g[0]));
     students.forEach(st => {
@@ -182,6 +184,7 @@ async function renderHome(res, userEmail, errM = "") {
   }
 }
 
+// Single place to render admin dashboard
 async function renderAdminHome(res, flashMsg = "") {
   try {
     const [slots, confirms, ctrl] = await Promise.all([
@@ -202,43 +205,46 @@ async function renderAdminHome(res, flashMsg = "") {
     return errorPage(res, e);
   }
 }
+
 // ---- Routes ----
 // GET
-app.get("/", function(req,res){
+app.get("/", function (req, res) {
   res.render("landing");
 });
-app.get("/admin-login", function(req,res){
-  res.render("admin-login", {errM:""});
+app.get("/admin", function (req, res) {
+  return renderAdminHome(res);
 });
-app.get("/login", function(req,res){
-  res.render("login", {errM:"", errM2:""});
+app.get("/admin-login", function (req, res) {
+  res.render("admin-login", { errM: "" });
 });
-app.get("/activate-account", function(req,res){
-  res.render("activate-account", {errM:"", errM2:""});
+app.get("/login", function (req, res) {
+  res.render("login", { errM: "", errM2: "" });
 });
-app.get('*', function(req, res) {
+app.get("/activate-account", function (req, res) {
+  res.render("activate-account", { errM: "", errM2: "" });
+});
+app.get('*', function (req, res) {
   res.redirect('/');
 });
 
-// POST
-// Activate account
-app.post("/activate-account", function(req,res){
+// POST — Activate account
+app.post("/activate-account", function (req, res) {
   const email = _.toLower(req.body.email);
   const password = req.body.password;
 
-  Student.findOne({email}, function(err, foundUser){
-    if(err) return res.render("activate-account", {errM:"An error occured. Please try again or contact apolloyimde@gmail.com."});
-    if (!foundUser) return res.render("activate-account", {errM:"Email not found. Please use the login information sent to you or contact apolloyimde@gmail.com."});
-    if (foundUser.fName) return res.render("activate-account", {errM:"An account with this email has already been activated. Please use the login page or contact apolloyimde@gmail.com."});
+  Student.findOne({ email }, function (err, foundUser) {
+    if (err) return res.render("activate-account", { errM: "An error occured. Please try again or contact apolloyimde@gmail.com." });
+    if (!foundUser) return res.render("activate-account", { errM: "Email not found. Please use the login information sent to you or contact apolloyimde@gmail.com." });
+    if (foundUser.fName) return res.render("activate-account", { errM: "An account with this email has already been activated. Please use the login page or contact apolloyimde@gmail.com." });
 
-    bcrypt.compare(password,foundUser.password, function(err, ok){
-      if(err || !ok) return res.render("activate-account", {errM:"Incorrect password. Please use the login information sent to you or contact apolloyimde@gmail.com."});
+    bcrypt.compare(password, foundUser.password, function (err, ok) {
+      if (err || !ok) return res.render("activate-account", { errM: "Incorrect password. Please use the login information sent to you or contact apolloyimde@gmail.com." });
 
       Student.updateOne(
-        {email},
-        {fName:_.startCase(req.body.fName), lName:_.startCase(req.body.lName)},
-        async function(err){
-          if(err) return res.render("activate-account", {errM:"An error occured. Please try again or contact apolloyimde@gmail.com."});
+        { email },
+        { fName: _.startCase(req.body.fName), lName: _.startCase(req.body.lName) },
+        async function (err) {
+          if (err) return res.render("activate-account", { errM: "An error occured. Please try again or contact apolloyimde@gmail.com." });
           return renderHome(res, email, "Account activated!");
         }
       );
@@ -246,83 +252,67 @@ app.post("/activate-account", function(req,res){
   });
 });
 
-// Student login
-app.post("/login", function(req,res){
+// POST — Student login
+app.post("/login", function (req, res) {
   const email = _.toLower(req.body.email);
   const password = req.body.password;
 
-  Student.findOne({email}, function(err, foundUser){
-    if(err) return res.render("login", {errM:"", errM2:"An error occured. Please try again."});
-    if(!foundUser) return res.render("login", {errM:"", errM2:"Username or password was incorrect."});
-    if(!foundUser.fName) {
-      return res.render("login", {errM:"", errM2:"Account not activated. Please activate your account (https://the-match-apolloyim-2f158c0ae122.herokuapp.com/activate-account) or contact apolloyimde@gmail.com."});
+  Student.findOne({ email }, function (err, foundUser) {
+    if (err) return res.render("login", { errM: "", errM2: "An error occured. Please try again." });
+    if (!foundUser) return res.render("login", { errM: "", errM2: "Username or password was incorrect." });
+    if (!foundUser.fName) {
+      return res.render("login", {
+        errM: "", errM2: "Account not activated. Please activate your account (https://the-match-apolloyim-2f158c0ae122.herokuapp.com/activate-account) or contact apolloyimde@gmail.com."
+      });
     }
 
-    bcrypt.compare(password, foundUser.password, function(err, ok){
-      if(err || !ok) return res.render("login", {errM:"", errM2:"Username or password was incorrect."});
+    bcrypt.compare(password, foundUser.password, function (err, ok) {
+      if (err || !ok) return res.render("login", { errM: "", errM2: "Username or password was incorrect." });
       return renderHome(res, foundUser.email, "");
     });
   });
 });
 
-app.post("/admin-login", function(req, res) {
+// POST — Admin login -> go to admin dashboard
+app.post("/admin-login", function (req, res) {
   const email = _.toLower(req.body.email);
   const password = req.body.password;
 
-  Admin.findOne({ email }, function(err, foundAdmin) {
+  Admin.findOne({ email }, function (err, foundAdmin) {
     if (err) return res.render("admin-login", { errM: "An error occurred. Please try again." });
     if (!foundAdmin) return res.render("admin-login", { errM: "Email not found." });
 
-    bcrypt.compare(password, foundAdmin.password, function(err, ok) {
+    bcrypt.compare(password, foundAdmin.password, async function (err, ok) {
       if (err) return res.render("admin-login", { errM: "An error occurred. Please try again." });
       if (!ok) return res.render("admin-login", { errM: "Incorrect password." });
-
-      // IMPORTANT: use .lean() so the view receives plain JS objects
-      Slot.find({}).lean().exec(function(err, slots) {
-        if (err) return errorPage(res, err);
-
-        const array = setDisplayValues(slots); // now robust even if .lean() is missed elsewhere
-
-        Confirm.find({}).lean().exec(function(err, confirms) {
-          if (err) return errorPage(res, err);
-
-          res.render("admin-home", {
-            slots: array,
-            maxSlots: (res.locals.controls && res.locals.controls.maxSlots) || maxSlots,
-            allGroups: allGroups.sort(),
-            confirms
-          });
-        });
-      });
+      return renderAdminHome(res, "Logged in.");
     });
   });
 });
 
-app.post("/claim", function(req,res){
+// POST — Claim (blocked if matchingLocked)
+app.post("/claim", function (req, res) {
   const userEmail = _.toLower(req.body.userEmail);
-  const slotId    = req.body.slotId;
+  const slotId = req.body.slotId;
 
-  Control.findOne({ id: 1 }).lean().exec(function(err, ctrl) {
+  Control.findOne({ id: 1 }).lean().exec(function (err, ctrl) {
     if (err) return errorPage(res, err);
 
-    // Block adding if matching is locked
     if (ctrl && ctrl.matchingLocked === true) {
       return renderHome(res, userEmail, "Matching is currently locked. You can review/remove your matches but cannot add new ones.");
     }
 
-    Slot.findOne({_id:slotId}, function(err, slot){
+    Slot.findOne({ _id: slotId }, function (err, slot) {
       if (err || !slot) return errorPage(res, err || "Slot not found.");
 
-      // Already claimed
       if (slot.studentEmail) {
         return renderHome(res, userEmail, "This slot was already claimed. Please reload to see the latest availability.");
       }
 
-      // Claim it
       Slot.updateOne(
         { _id: slotId },
         { studentName: `${req.body.userFName} ${req.body.userLName}`, studentEmail: userEmail },
-        function(err){
+        function (err) {
           if (err) return errorPage(res, err);
           makeLog("Claim slot", userEmail, slotId, slotId);
           return renderHome(res, userEmail, "Successfully matched.");
@@ -332,23 +322,18 @@ app.post("/claim", function(req,res){
   });
 });
 
-// Unclaim slot (ALLOWED even when locked, UNLESS already confirmed)
-app.post("/unclaim", async function(req, res) {
+// POST — Unclaim (allowed even when locked, UNLESS confirmed)
+app.post("/unclaim", async function (req, res) {
   const slotId = req.body.slotId;
   const userEmail = _.toLower(req.body.userEmail);
 
   try {
-    // Check if user has confirmed
     const confirmDoc = await Confirm.findOne({ email: userEmail }).lean();
     if (confirmDoc && confirmDoc.confirmed) {
       return renderHome(res, userEmail, "You have already confirmed your slots. You can no longer remove them.");
     }
 
-    // Proceed with removal
-    await Slot.updateOne(
-      { _id: slotId },
-      { studentName: "", studentEmail: "" }
-    );
+    await Slot.updateOne({ _id: slotId }, { studentName: "", studentEmail: "" });
 
     makeLog("Unclaim", userEmail, slotId, slotId);
     return renderHome(res, userEmail, "Successfully removed slot.");
@@ -357,64 +342,64 @@ app.post("/unclaim", async function(req, res) {
   }
 });
 
-// Confirm slots
-app.post("/confirm", function(req, res) {
+// POST — Confirm (sets confirmed flag; disables confirm button on home)
+app.post("/confirm", function (req, res) {
   const userEmail = _.toLower(req.body.userEmail);
   Confirm.updateOne(
     { email: userEmail },
     { $set: { confirmed: true } },
     { upsert: true },
-    function(err) {
+    function (err) {
       if (err) return errorPage(res, err);
       return renderHome(res, userEmail, "Successfully confirmed your slots.");
     }
   );
 });
 
-// Bulk create accounts (admins + students)
-app.post("/admin-newAccounts", function(req,res){
+// POST — Admin: bulk create accounts (admins + students)
+app.post("/admin-newAccounts", function (req, res) {
   const uploadUserArray = req.body.uploadUsers || "";
   let users = uploadUserArray.split("###").map(x => x.split("///"));
 
-  users.forEach(function(user){
+  users.forEach(function (user) {
     const email = user[0];
     const password = user[1];
     const group = user[2];
-    if(email&&password&&group){
-      bcrypt.hash(password,saltRounds,function(err,hashedPassword){
-        if(err) return;
-        const newStudent = new Student ({
-          email:_.toLower(email), password:hashedPassword, group:group
+    if (email && password && group) {
+      bcrypt.hash(password, saltRounds, function (err, hashedPassword) {
+        if (err) return;
+        const newStudent = new Student({
+          email: _.toLower(email), password: hashedPassword, group
         });
-        newStudent.save(()=>{});
+        newStudent.save(() => { });
       });
     }
   });
 
   const uploadAdmins = req.body.uploadAdmins || "";
   let admins = uploadAdmins.split("###").map(x => x.split("///"));
-  admins.forEach(function(admin){
+  admins.forEach(function (admin) {
     const fName = admin[0], lName = admin[1], email = admin[2], password = admin[3];
-    if(fName&&lName&&email&&password){
-      bcrypt.hash(password,saltRounds,function(err,hashedPassword){
-        if(err) return;
-        const newAdmin = new Admin ({
-          fName, lName, email:_.toLower(email), password:hashedPassword
+    if (fName && lName && email && password) {
+      bcrypt.hash(password, saltRounds, function (err, hashedPassword) {
+        if (err) return;
+        const newAdmin = new Admin({
+          fName, lName, email: _.toLower(email), password: hashedPassword
         });
-        newAdmin.save(()=>{});
+        newAdmin.save(() => { });
       });
     }
   });
 
-  res.redirect("/");
+  return renderAdminHome(res, "Accounts processed.");
 });
 
-// Admin: match settings (lock toggle, maxSlots)
-app.post("/admin-matchSettings", function(req, res) {
+// POST — Admin: match settings (lock toggle, maxSlots)
+app.post("/admin-matchSettings", function (req, res) {
   const maxSlotsValue = parseInt(req.body.maxSlots || maxSlots, 10);
   const lockValue = req.body.matchingLock === "true";
 
-  // remember checked groups (not used elsewhere right now)
+  // remember checked groups (optional)
   for (let i = 0; i < allGroups.length; i++) {
     const box = req.body[allGroups[i][0]];
     allGroups[i][1] = !!box;
@@ -424,46 +409,36 @@ app.post("/admin-matchSettings", function(req, res) {
     { id: 1 },
     { $set: { matchingLocked: lockValue, maxSlots: maxSlotsValue } },
     { upsert: true },
-    function(err) {
+    function (err) {
       if (err) {
         console.error("Error updating Control:", err);
-        return res.redirect("/");
+        return renderAdminHome(res, "Error updating match settings.");
       }
-      // Optional mirror to students
-      Student.updateMany({}, { matchingLocked: lockValue }, function() {
-        return res.redirect("/");
+      // Optional: mirror to students
+      Student.updateMany({}, { matchingLocked: lockValue }, function () {
+        return renderAdminHome(res, "Match settings updated.");
       });
     }
   );
 });
 
-// --- Admin: reset ALL confirmations (clean slate) ---
-app.post("/admin-reset-confirms", async function(req, res) {
+// POST — Admin: reset ALL confirmations (clean slate)
+app.post("/admin-reset-confirms", async function (req, res) {
   try {
-    // Clean slate: remove the `confirmed` field from all docs
     await Confirm.updateMany({}, { $unset: { confirmed: "" } });
-    // Optional: also remove empty docs (no fields left) — uncomment if you want
-    // await Confirm.deleteMany({ confirmed: { $exists: false } });
-
-    return res.redirect("/");
+    return renderAdminHome(res, "All confirmations cleared.");
   } catch (err) {
     return errorPage(res, err);
   }
 });
 
-// --- Admin: clear confirmation for ONE student ---
-app.post("/admin-clear-confirm", async function(req, res) {
+// POST — Admin: clear confirmation for ONE student
+app.post("/admin-clear-confirm", async function (req, res) {
   try {
     const email = _.toLower(req.body.email || "");
-    if (!email) return res.redirect("/");
-
-    // Remove the confirmed flag for this one student
+    if (!email) return renderAdminHome(res, "No email provided.");
     await Confirm.updateOne({ email }, { $unset: { confirmed: "" } }, { upsert: false });
-
-    // Optional alternative: fully delete their Confirm doc
-    // await Confirm.deleteOne({ email });
-
-    return res.redirect("/");
+    return renderAdminHome(res, `Confirmation cleared for ${email}.`);
   } catch (err) {
     return errorPage(res, err);
   }
@@ -471,8 +446,8 @@ app.post("/admin-clear-confirm", async function(req, res) {
 
 // ---- Server ----
 let port = process.env.PORT;
-if(!port) port = 3000;
+if (!port) port = 3000;
 
-app.listen(port, function() {
+app.listen(port, function () {
   console.log("Server started!");
 });
