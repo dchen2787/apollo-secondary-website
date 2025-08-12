@@ -403,46 +403,49 @@
     <div class="alert alert-info">PCP‑only mode is ON. You can only claim primary‑care slots right now.</div>
   <% } %>
 
+  <% 
+    var u = user || {};
+    var uf = u.fName || '';
+    var ul = u.lName || '';
+    var ue = u.email || '';
+    var initials = ((uf && uf[0]) || '') + ((ul && ul[0]) || '');
+  %>
+
   <!-- Hero -->
   <div class="page-hero">
-    <div class="avatar">
-      <% const initials = (user?.fName?.[0] || '') + (user?.lName?.[0] || ''); %>
-      <%= initials.toUpperCase() || "U" %>
-    </div>
+    <div class="avatar"><%= (initials || 'U').toUpperCase() %></div>
     <div>
       <div class="muted" style="font-size:14px;">Welcome</div>
-      <h1 style="margin:0;"><%= user && user.fName ? user.fName : (user?.email || "Student") %></h1>
+      <h1 style="margin:0;"><%= uf ? uf : (ue || "Student") %></h1>
     </div>
     <div style="margin-left:auto;">
-      <% if (!confirmed) { %>
+      <% if (!confirmed && ue) { %>
         <form action="/confirm" method="post">
-          <input type="hidden" name="userEmail" value="<%= user.email %>">
+          <input type="hidden" name="userEmail" value="<%= ue %>">
           <button class="btn-soft">Confirm My Slots</button>
         </form>
       <% } %>
     </div>
   </div>
 
-  <!-- Your matches (unchanged) -->
+  <!-- Your matches -->
   <h2 style="margin:16px 0 8px;">Your Matches</h2>
   <%
-    const mySlots = (slots || []).filter(s => s.studentEmail === user.email);
+    var mySlots = [];
+    (slots || []).forEach(function(s){ if (s.studentEmail === ue) mySlots.push(s); });
     if (mySlots.length === 0) { %>
       <div class="muted" style="margin-bottom:12px;">You haven’t claimed any slots yet.</div>
   <% } %>
 
   <% mySlots.forEach(function(slot){ 
-       const isPCP = ['Family Medicine (PCP)','Primary Care'].includes((slot.physSpecialty||'').trim());
+       var sp = (slot.physSpecialty || '').trim();
+       var isPCP = (sp === 'Family Medicine (PCP)' || sp === 'Primary Care');
   %>
     <div class="slot-card">
       <div class="head">
         <strong><%= slot.physName || '—' %></strong>
-        <% if (slot.physSpecialty) { %>
-          <span class="badge-soft"><%= slot.physSpecialty %></span>
-        <% } %>
-        <% if (!isPCP && slot.physSpecialty) { %>
-          <span class="pill-nonpcp">Non‑PCP</span>
-        <% } %>
+        <% if (sp) { %><span class="badge-soft"><%= sp %></span><% } %>
+        <% if (!isPCP && sp) { %><span class="pill-nonpcp">Non‑PCP</span><% } %>
       </div>
       <div class="muted" style="margin:6px 0;">
         <strong><%= slot.dDate || '-' %></strong> • <%= (slot.timeStart || '-') %> to <%= (slot.timeEnd || '-') %> • <%= slot.location || '-' %>
@@ -451,7 +454,7 @@
 
       <div style="margin-top:10px;">
         <form action="/unclaim" method="post" style="display:inline;">
-          <input type="hidden" name="userEmail" value="<%= user.email %>">
+          <input type="hidden" name="userEmail" value="<%= ue %>">
           <input type="hidden" name="slotId" value="<%= slot._id %>">
           <button type="submit" class="btn-ghost">Remove</button>
         </form>
@@ -463,11 +466,14 @@
   <h2 style="margin:20px 0 8px;">Browse Slots</h2>
 
   <%
-    // Build unique specialties list
-    const specsSet = new Set((slots || []).map(s => (s.physSpecialty || '').trim()).filter(Boolean));
-    const specialties = Array.from(specsSet).sort();
-    const matchingLocked = !!(controls && controls.matchingLocked);
-    const PCPonly = !!(controls && controls.PCPonly);
+    var specsSet = {};
+    (slots || []).forEach(function(s){
+      var sp = (s.physSpecialty || '').trim();
+      if (sp) specsSet[sp] = true;
+    });
+    var specialties = Object.keys(specsSet).sort();
+    var matchingLocked = !!(controls && controls.matchingLocked);
+    var PCPonly = !!(controls && controls.PCPonly);
   %>
 
   <div class="controls" style="margin-bottom:10px;">
@@ -488,28 +494,26 @@
 
   <div id="slotList">
     <% (slots || []).forEach(function(slot){ 
-         const isPCP = ['Family Medicine (PCP)','Primary Care'].includes((slot.physSpecialty||'').trim());
-         const claimDisabledReason =
+         var sp = (slot.physSpecialty || '').trim();
+         var isPCP = (sp === 'Family Medicine (PCP)' || sp === 'Primary Care');
+
+         var claimDisabledReason =
            confirmed ? "You have already confirmed."
          : matchingLocked ? "Matching is locked."
-         : PCPonly && !isPCP ? "PCP‑only is active."
+         : (PCPonly && !isPCP) ? "PCP‑only is active."
          : null;
 
-         const claimedState =
-           slot.studentEmail ? (slot.studentEmail === user.email ? "me" : "other") : "no";
+         var claimedState =
+           slot.studentEmail ? (slot.studentEmail === ue ? "me" : "other") : "no";
     %>
       <div class="slot-card searchable"
-           data-search="<%= [slot.physName, slot.physSpecialty, slot.location, slot.notes].filter(Boolean).join(' ').toLowerCase() %>"
-           data-spec="<%= (slot.physSpecialty||'').trim() %>"
+           data-search="<%= [slot.physName || '', sp || '', slot.location || '', slot.notes || ''].join(' ').toLowerCase() %>"
+           data-spec="<%= sp %>"
            data-claimed="<%= claimedState %>">
         <div class="head">
           <strong><%= slot.physName || '—' %></strong>
-          <% if (slot.physSpecialty) { %>
-            <span class="badge-soft"><%= slot.physSpecialty %></span>
-          <% } %>
-          <% if (!isPCP && slot.physSpecialty) { %>
-            <span class="pill-nonpcp">Non‑PCP</span>
-          <% } %>
+          <% if (sp) { %><span class="badge-soft"><%= sp %></span><% } %>
+          <% if (!isPCP && sp) { %><span class="pill-nonpcp">Non‑PCP</span><% } %>
         </div>
 
         <div class="muted" style="margin:6px 0;">
@@ -520,9 +524,9 @@
         <div style="margin-top:10px;">
           <% if (!slot.studentEmail) { %>
             <form action="/claim" method="post" style="display:inline;">
-              <input type="hidden" name="userEmail" value="<%= user.email %>">
-              <input type="hidden" name="userFName" value="<%= user.fName %>">
-              <input type="hidden" name="userLName" value="<%= user.lName %>">
+              <input type="hidden" name="userEmail" value="<%= ue %>">
+              <input type="hidden" name="userFName" value="<%= uf %>">
+              <input type="hidden" name="userLName" value="<%= ul %>">
               <input type="hidden" name="slotId" value="<%= slot._id %>">
               <button type="submit" class="btn-soft"
                 <% if (claimDisabledReason) { %> disabled title="<%= claimDisabledReason %>" <% } %>>
@@ -533,9 +537,9 @@
               <span class="muted" style="margin-left:8px;"><%= claimDisabledReason %></span>
             <% } %>
           <% } else { %>
-            <% if (slot.studentEmail === user.email) { %>
+            <% if (slot.studentEmail === ue) { %>
               <form action="/unclaim" method="post" style="display:inline;">
-                <input type="hidden" name="userEmail" value="<%= user.email %>">
+                <input type="hidden" name="userEmail" value="<%= ue %>">
                 <input type="hidden" name="slotId" value="<%= slot._id %>">
                 <button type="submit" class="btn-ghost">Remove</button>
               </form>
@@ -553,38 +557,41 @@
 
 <script>
   (function(){
-    const q = document.getElementById('search');
-    const spec = document.getElementById('specFilter');
-    const onlyOpen = document.getElementById('onlyOpen');
-    const cards = Array.from(document.querySelectorAll('#slotList .slot-card'));
+    var q = document.getElementById('search');
+    var spec = document.getElementById('specFilter');
+    var onlyOpen = document.getElementById('onlyOpen');
+    var cards = Array.from(document.querySelectorAll('#slotList .slot-card'));
 
     function getSelectedSpecs(){
-      return Array.from(spec.selectedOptions || []).map(o => o.value);
+      var out = [];
+      var opts = spec ? spec.selectedOptions : [];
+      for (var i=0; i<(opts ? opts.length : 0); i++) out.push(opts[i].value);
+      return out;
     }
 
     function matchesFilters(card){
-      const query = (q.value || '').toLowerCase().trim();
-      const hay = (card.getAttribute('data-search') || '');
-      if (query && !hay.includes(query)) return false;
+      var query = (q && q.value ? q.value : '').toLowerCase().trim();
+      var hay = card.getAttribute('data-search') || '';
+      if (query && hay.indexOf(query) === -1) return false;
 
-      const selected = getSelectedSpecs();
-      const s = card.getAttribute('data-spec') || '';
-      if (selected.length && !selected.includes(s)) return false;
+      var selected = getSelectedSpecs();
+      var s = card.getAttribute('data-spec') || '';
+      if (selected.length && selected.indexOf(s) === -1) return false;
 
-      const claimed = card.getAttribute('data-claimed');
-      if (onlyOpen.checked && claimed !== 'no') return false;
+      var claimed = card.getAttribute('data-claimed');
+      if (onlyOpen && onlyOpen.checked && claimed !== 'no') return false;
 
       return true;
     }
 
     function apply(){
-      cards.forEach(c => { c.style.display = matchesFilters(c) ? '' : 'none'; });
+      cards.forEach(function(c){ c.style.display = matchesFilters(c) ? '' : 'none'; });
     }
 
-    q.addEventListener('input', apply);
-    spec.addEventListener('change', apply);
-    onlyOpen.addEventListener('change', apply);
-    apply(); // initial
+    if (q) q.addEventListener('input', apply);
+    if (spec) spec.addEventListener('change', apply);
+    if (onlyOpen) onlyOpen.addEventListener('change', apply);
+    apply();
   })();
 </script>
 
