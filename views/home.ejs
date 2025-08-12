@@ -31,12 +31,28 @@
   /* Filter panel */
   .filter-card { background:#ffffff; border:1px solid #e5e7eb; box-shadow:0 8px 24px rgba(0,0,0,.06); border-radius:16px; padding:16px; margin:14px 0 18px; }
   .filter-head { font-weight:600; color:#374151; margin-bottom:10px; }
-  .controls { display:flex; gap:16px; flex-wrap:wrap; align-items:center; justify-content:center; }
-  .searchbar { border-radius:12px; border:1px solid #e5e7eb; padding:10px 12px; width:100%; max-width:520px; }
-  .dropdown .dropdown-menu { max-height:260px; overflow:auto; }
-  .dropdown-toggle { border-radius:12px; padding:10px 14px; border:1px solid #e5e7eb; background:#f9fafb; }
-  .dropdown-toggle:after { margin-left:8px; }
-  #specHint { text-align:center; width:100%; }
+  /* Center + align everything on the same baseline */
+  .controls {
+    display:grid;
+    grid-template-columns: minmax(280px, 520px) minmax(240px, 320px) auto;
+    gap:16px;
+    justify-content:center;
+    align-items:center;
+  }
+  .searchbar { border-radius:12px; border:1px solid #e5e7eb; padding:10px 12px; width:100%; }
+  .dropdown { width:100%; }
+  .dropdown .dropdown-toggle { 
+    width:100%; 
+    border-radius:12px; padding:10px 14px; 
+    border:1px solid #e5e7eb; background:#f9fafb; 
+    text-align:left;
+  }
+  .dropdown .dropdown-menu { 
+    max-height:260px; overflow:auto; 
+    z-index: 1060; /* ensure above cards */
+    width:100%;
+  }
+  #specHint { text-align:center; width:100%; font-size:12px; margin-top:6px; }
   label.checkbox { display:flex; align-items:center; gap:8px; }
 
   /* Section spacing */
@@ -64,7 +80,7 @@
   <% } %>
   <% if (controls && controls.PCPonly) { %>
     <div class="alert alert-info">
-      PCP-only mode is ON. You can only claim primary-care slots right now.
+      PCP‑only mode is ON. You can only claim primary‑care slots right now.
       <button type="button" class="close" aria-label="Close">&times;</button>
     </div>
   <% } %>
@@ -106,7 +122,7 @@
       <div class="head">
         <strong><%= slot.physName || '—' %></strong>
         <% if (slot.physSpecialty) { %><span class="badge-soft"><%= slot.physSpecialty %></span><% } %>
-        <% if (PCPonly && slot.physSpecialty && !isPCP) { %><span class="pill-nonpcp">Non-PCP</span><% } %>
+        <% if (PCPonly && slot.physSpecialty && !isPCP) { %><span class="pill-nonpcp">Non‑PCP</span><% } %>
       </div>
       <div class="muted" style="margin:6px 0;">
         <strong><%= slot.dDate || '-' %></strong> • <%= (slot.timeStart || '-') %> to <%= (slot.timeEnd || '-') %> • <%= slot.location || '-' %>
@@ -155,13 +171,22 @@
 
     <div class="filter-card">
       <div class="filter-head">Search and filter</div>
+
       <div class="controls">
+        <!-- Search -->
         <input id="search" class="searchbar" placeholder="Search by physician, specialty, location, or notes…">
 
-        <!-- Multi-select dropdown -->
-        <div class="dropdown">
-          <button class="dropdown-toggle" type="button" id="specDropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-            Specialties (multi-select)
+        <!-- Multi-select dropdown (wider + centered + stays open) -->
+        <div class="dropdown" id="specDropdownWrap">
+          <button 
+            class="dropdown-toggle" 
+            type="button" 
+            id="specDropdown" 
+            data-toggle="dropdown" 
+            aria-haspopup="true" 
+            aria-expanded="false"
+            role="button">
+            Specialties (multi‑select)
           </button>
           <div class="dropdown-menu p-2" aria-labelledby="specDropdown">
             <label class="dropdown-item">
@@ -174,10 +199,11 @@
               </label>
             <% }); %>
           </div>
-          <div class="muted" id="specHint" style="font-size:12px; margin-top:2px;">All specialties selected</div>
+          <div class="muted" id="specHint">All specialties selected</div>
         </div>
 
-        <label class="checkbox">
+        <!-- Only open -->
+        <label class="checkbox" style="justify-self:start;">
           <input id="onlyOpen" type="checkbox" checked>
           <span>Only show not claimed</span>
         </label>
@@ -187,7 +213,7 @@
     <div id="slotList">
       <% (slots || []).forEach(function(slot){
            const isPCP2 = ['Family Medicine (PCP)','Primary Care'].includes((slot.physSpecialty||'').trim());
-           const claimDisabledReason = (controls && controls.PCPonly && !isPCP2) ? "PCP-only is active." : null;
+           const claimDisabledReason = (controls && controls.PCPonly && !isPCP2) ? "PCP‑only is active." : null;
            const claimedState = slot.studentEmail ? (slot.studentEmail === user.email ? "me" : "other") : "no";
       %>
         <div class="slot-card searchable"
@@ -197,7 +223,7 @@
           <div class="head">
             <strong><%= slot.physName || '—' %></strong>
             <% if (slot.physSpecialty) { %><span class="badge-soft"><%= slot.physSpecialty %></span><% } %>
-            <% if ((controls && controls.PCPonly) && slot.physSpecialty && !isPCP2) { %><span class="pill-nonpcp">Non-PCP</span><% } %>
+            <% if ((controls && controls.PCPonly) && slot.physSpecialty && !isPCP2) { %><span class="pill-nonpcp">Non‑PCP</span><% } %>
           </div>
 
           <div class="muted" style="margin:6px 0;">
@@ -241,22 +267,29 @@
 </div>
 
 <script>
+  // Dismiss closable alerts (not the locked banner or confirmed message)
   document.querySelectorAll('.alert .close').forEach(btn => {
     btn.addEventListener('click', () => btn.closest('.alert')?.remove());
   });
+
   (function(){
     const q = document.getElementById('search');
     const onlyOpen = document.getElementById('onlyOpen');
     const cards = Array.from(document.querySelectorAll('#slotList .slot-card'));
+
+    // Keep dropdown open when clicking inside it
     document.querySelectorAll('.dropdown-menu').forEach(menu => {
       menu.addEventListener('click', e => e.stopPropagation());
     });
+
     const specAll = document.getElementById('specAll');
     const specChecks = Array.from(document.querySelectorAll('.spec-option'));
     const specHint = document.getElementById('specHint');
+
     function selectedSpecs(){ return specChecks.filter(c => c.checked).map(c => c.value); }
     function updateSpecHint(){
       const picked = specChecks.filter(c => c.checked).length;
+      if (!specAll) return;
       if (specAll.checked || picked === 0 || picked === specChecks.length) {
         specHint.textContent = 'All specialties selected';
       } else {
@@ -273,8 +306,10 @@
       return true;
     }
     function apply(){ cards.forEach(c => { c.style.display = matches(c) ? '' : 'none'; }); }
+
     q?.addEventListener('input', apply);
     onlyOpen?.addEventListener('change', apply);
+
     specAll?.addEventListener('change', () => {
       if (specAll.checked) specChecks.forEach(c => c.checked = false);
       updateSpecHint(); apply();
@@ -283,12 +318,20 @@
       specAll.checked = !specChecks.some(x => x.checked);
       updateSpecHint(); apply();
     }));
+
     updateSpecHint(); apply();
   })();
 </script>
 
+<!-- Bootstrap (needed for dropdown) -->
 <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
 <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+<script>
+  // Explicitly initialize dropdown to avoid flaky behavior
+  $(function () {
+    $('#specDropdown').dropdown();
+  });
+</script>
 
 <%- include("./partials/footer"); -%>
