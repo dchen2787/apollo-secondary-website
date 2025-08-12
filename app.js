@@ -202,6 +202,7 @@ async function renderHome(res, userEmail, errM = "") {
       maxSlots: (ctrl && ctrl.maxSlots) || maxSlots,
       errM,
       confirmed
+      isConfirmed: confirmed   // <-- add this line
     });
   } catch (e) {
     console.error(e);
