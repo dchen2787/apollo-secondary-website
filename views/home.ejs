@@ -102,122 +102,125 @@
   specialties.sort();
 %>
 
-<h1>Shadow Slots</h1><br/>
-<!-- Filter Bar -->
-<div style="margin: 0.5rem 0 1rem; padding: 0.75rem; background: #f8f8f8; border: 1px solid #ccc; border-radius:6px;">
-  <div class="row">
-    <div class="col-12 col-md-4" style="margin-bottom:.5rem;">
-      <input id="slotSearch" class="form-control" placeholder="Search by physician or specialty">
-    </div>
+<% if (!(controls && controls.matchingLocked)) { %>
 
-    <div class="col-12 col-md-5" style="margin-bottom:.5rem;">
-      <div class="dropdown">
-        <button class="btn btn-light dropdown-toggle w-100" type="button" id="specDropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-          Specialties (multi-select)
-        </button>
-        <div class="dropdown-menu w-100 p-2" aria-labelledby="specDropdown" style="max-height: 260px; overflow:auto;">
-          <label class="dropdown-item mb-1">
-            <input type="checkbox" id="specAll" checked> <strong>All specialties</strong>
-          </label>
-          <div class="dropdown-divider"></div>
-          <% specialties.forEach(function(spec){ %>
-            <label class="dropdown-item mb-1">
-              <input type="checkbox" class="spec-option" value="<%= spec %>">
-              <span><%= spec %></span>
-            </label>
-          <% }) %>
-        </div>
+  <h1>Shadow Slots</h1><br/>
+  <!-- Filter Bar -->
+  <div style="margin: 0.5rem 0 1rem; padding: 0.75rem; background: #f8f8f8; border: 1px solid #ccc; border-radius:6px;">
+    <div class="row">
+      <div class="col-12 col-md-4" style="margin-bottom:.5rem;">
+        <input id="slotSearch" class="form-control" placeholder="Search by physician or specialty">
       </div>
-      <small id="specCountHint" style="opacity:.7; display:block; margin-top:.25rem;">All specialties selected</small>
-    </div>
-
-    <div class="col-6 col-md-2 d-flex align-items-center" style="margin-bottom:.5rem;">
-      <label class="mb-0">
-        <input id="onlyUnclaimed" type="checkbox" style="margin-right:6px;">
-        Only show unmatched slots
-      </label>
-    </div>
-
-    <div class="col-6 col-md-1 d-flex align-items-center" style="margin-bottom:.5rem;">
-      <button id="resetFilters" type="button" class="btn btn-light w-100">Reset</button>
-    </div>
-  </div>
-</div>
-
-<!-- End -->
-<% const pcpOnly = controls && controls.PCPonly === true; %>
-
-<!-- <p>Please remember, all slots currently listed below fall under the category of Primary Care. More specialty slots will be available starting Wednesday, 10/20.</p><br/><br/> -->
-<!-- <div class="container"> -->
-  <div class="row chart-titles">
-    <div class="col col-12 col-lg-2">
-      Physician
-    </div>
-    <div class="col col-12 col-lg-2">
-      Date
-    </div>
-    <div class="col col-12 col-lg-2">
-      Time
-    </div>
-    <div class="col col-12 col-lg-2">
-      Location
-    </div>
-    <div class="col col-12 col-lg-2">
-      Notes
-    </div>
-    <div class="col col-12 col-lg-2">
-      Matched?
+  
+      <div class="col-12 col-md-5" style="margin-bottom:.5rem;">
+        <div class="dropdown">
+          <button class="btn btn-light dropdown-toggle w-100" type="button" id="specDropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+            Specialties (multi-select)
+          </button>
+          <div class="dropdown-menu w-100 p-2" aria-labelledby="specDropdown" style="max-height: 260px; overflow:auto;">
+            <label class="dropdown-item mb-1">
+              <input type="checkbox" id="specAll" checked> <strong>All specialties</strong>
+            </label>
+            <div class="dropdown-divider"></div>
+            <% specialties.forEach(function(spec){ %>
+              <label class="dropdown-item mb-1">
+                <input type="checkbox" class="spec-option" value="<%= spec %>">
+                <span><%= spec %></span>
+              </label>
+            <% }) %>
+          </div>
+        </div>
+        <small id="specCountHint" style="opacity:.7; display:block; margin-top:.25rem;">All specialties selected</small>
+      </div>
+  
+      <div class="col-6 col-md-2 d-flex align-items-center" style="margin-bottom:.5rem;">
+        <label class="mb-0">
+          <input id="onlyUnclaimed" type="checkbox" style="margin-right:6px;">
+          Only show unmatched slots
+        </label>
+      </div>
+  
+      <div class="col-6 col-md-1 d-flex align-items-center" style="margin-bottom:.5rem;">
+        <button id="resetFilters" type="button" class="btn btn-light w-100">Reset</button>
+      </div>
     </div>
   </div>
-<hr>
-<% slots.forEach(function(slot){ %>
-  <!-- !controls.PCPonly ||  -->
-  <!-- slot.physSpecialty.includes("Primary Care") -->
-  <% if(true){%>
-
-<div class="slot-row"
-     data-phys="<%= (slot.physName || '').toLowerCase() %>"
-     data-spec="<%= (slot.physSpecialty || '').toLowerCase() %>"
-     data-filled="<%= (slot.studentEmail && slot.studentEmail.length>0) ? 'true' : 'false' %>">
-
-  <div class="row">
-    <div class="col col-12 col-lg-2">
-      <%= slot.physName %>, <%=slot.physSpecialty %>
+  
+  <!-- End -->
+  <% const pcpOnly = controls && controls.PCPonly === true; %>
+  
+  <!-- <p>Please remember, all slots currently listed below fall under the category of Primary Care. More specialty slots will be available starting Wednesday, 10/20.</p><br/><br/> -->
+  <!-- <div class="container"> -->
+    <div class="row chart-titles">
+      <div class="col col-12 col-lg-2">
+        Physician
+      </div>
+      <div class="col col-12 col-lg-2">
+        Date
+      </div>
+      <div class="col col-12 col-lg-2">
+        Time
+      </div>
+      <div class="col col-12 col-lg-2">
+        Location
+      </div>
+      <div class="col col-12 col-lg-2">
+        Notes
+      </div>
+      <div class="col col-12 col-lg-2">
+        Matched?
+      </div>
     </div>
-    <div class="col col-12 col-lg-2"><%= slot.dDate %></div>
-    <div class="col col-12 col-lg-2"><%= slot.timeStart %> to <%= slot.timeEnd %></div>
-    <div class="col col-12 col-lg-2"><%= slot.location %></div>
-    <div class="col col-12 col-lg-2"><%= slot.notes %></div>
-    <div class="col col-12 col-lg-2">
-      <% var btnProp = null; %>
-      <% count >= maxSlots ? btnProp = "disabled" : null %>
-
-      <% if (slot.studentEmail && slot.studentEmail.length>0) { %>
-        <p class="italics">Filled</p>
-      <% } else { %>
-        <% if (pcpOnly && !slot.isPCP) { %>
-          <button class="btn" disabled title="PCP-only Phase">Match</button>
-          <small style="opacity:.7; margin-left:.5rem;">(PCP-only active)</small>
+  <hr>
+  <% slots.forEach(function(slot){ %>
+    <!-- !controls.PCPonly ||  -->
+    <!-- slot.physSpecialty.includes("Primary Care") -->
+    <% if(true){%>
+  
+  <div class="slot-row"
+       data-phys="<%= (slot.physName || '').toLowerCase() %>"
+       data-spec="<%= (slot.physSpecialty || '').toLowerCase() %>"
+       data-filled="<%= (slot.studentEmail && slot.studentEmail.length>0) ? 'true' : 'false' %>">
+  
+    <div class="row">
+      <div class="col col-12 col-lg-2">
+        <%= slot.physName %>, <%=slot.physSpecialty %>
+      </div>
+      <div class="col col-12 col-lg-2"><%= slot.dDate %></div>
+      <div class="col col-12 col-lg-2"><%= slot.timeStart %> to <%= slot.timeEnd %></div>
+      <div class="col col-12 col-lg-2"><%= slot.location %></div>
+      <div class="col col-12 col-lg-2"><%= slot.notes %></div>
+      <div class="col col-12 col-lg-2">
+        <% var btnProp = null; %>
+        <% count >= maxSlots ? btnProp = "disabled" : null %>
+  
+        <% if (slot.studentEmail && slot.studentEmail.length>0) { %>
+          <p class="italics">Filled</p>
         <% } else { %>
-          <form action="/claim" method="post">
-            <input type="hidden" name="userFName" value="<%=user.fName%>">
-            <input type="hidden" name="userLName" value="<%=user.lName%>">
-            <input type="hidden" name="userEmail" value="<%=user.email%>">
-            <input type="hidden" name="slotId" value="<%=slot._id%>">
-            <button type="submit" name="button" class="btn <%=btnProp%>" <%=btnProp%>>Match</button>
-          </form>
+          <% if (pcpOnly && !slot.isPCP) { %>
+            <button class="btn" disabled title="PCP-only Phase">Match</button>
+            <small style="opacity:.7; margin-left:.5rem;">(PCP-only active)</small>
+          <% } else { %>
+            <form action="/claim" method="post">
+              <input type="hidden" name="userFName" value="<%=user.fName%>">
+              <input type="hidden" name="userLName" value="<%=user.lName%>">
+              <input type="hidden" name="userEmail" value="<%=user.email%>">
+              <input type="hidden" name="slotId" value="<%=slot._id%>">
+              <button type="submit" name="button" class="btn <%=btnProp%>" <%=btnProp%>>Match</button>
+            </form>
+          <% } %>
         <% } %>
-      <% } %>
+      </div>
     </div>
+  
+    <hr />
   </div>
-
-  <hr />
-</div>
-
-
-<% }}) %>
-<%  } %>
-</div>
+  
+  
+  <% }}) %>
+  <%  } %>
+  </div>
+<% } %>
 
 
 <!-- filter logic -->
