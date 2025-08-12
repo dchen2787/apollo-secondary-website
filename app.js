@@ -182,6 +182,26 @@ async function renderHome(res, userEmail, errM = "") {
   }
 }
 
+async function renderAdminHome(res, flashMsg = "") {
+  try {
+    const [slots, confirms, ctrl] = await Promise.all([
+      Slot.find({}).lean(),
+      Confirm.find({}).lean(),
+      Control.findOne({ id: 1 }).lean()
+    ]);
+    const array = setDisplayValues(slots);
+
+    res.render("admin-home", {
+      slots: array,
+      maxSlots: (ctrl && ctrl.maxSlots) || maxSlots,
+      allGroups: allGroups.sort(),
+      confirms,
+      errM: flashMsg || ""
+    });
+  } catch (e) {
+    return errorPage(res, e);
+  }
+}
 // ---- Routes ----
 // GET
 app.get("/", function(req,res){
