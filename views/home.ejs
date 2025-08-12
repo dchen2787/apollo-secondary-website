@@ -1,5 +1,6 @@
 <%- include("./partials/header"); -%>
 <div id="view-shadow-slots">
+<% const isConfirmed = (typeof confirmed !== 'undefined' && confirmed); %>
   <% if(errM){%>
     <div class="alert alert-success">
       <h6 class="mb-0"><%=errM%>
@@ -36,7 +37,7 @@
   <br /> 
 
   <!-- future todo: make confirm form disappear after student has confirmed once ( done :) ) --> 
-  <% if (confirmed) { %>
+  <% if (isConfirmed) { %>
     <p>I can attend all slots listed above:</p>
     <button type="button" class="btn" disabled>Slots confirmed</button>
   <% } else { %>
