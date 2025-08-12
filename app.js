@@ -92,16 +92,36 @@ function makeLog(type, user, update, slotId){
 }
 
 function setDisplayValues(slots){
-  const sortedSlots = (slots || []).sort((a, b) => (a.date || 0) - (b.date || 0));
-  return sortedSlots.map(s => {
-    const x = {...s};
-    if (x.date) {
-      const dt = new Date(x.date);
-      x.dDate = `${months[dt.getMonth()]} ${dt.getDate()}, ${dt.getFullYear()}`;
+  const list = Array.isArray(slots) ? slots : [];
+
+  const normalized = list.map((s) => {
+    // Accept either a Mongoose doc or a plain object
+    const obj = (s && typeof s.toObject === 'function') ? s.toObject() : (s || {});
+
+    // Safe date formatting
+    let dDate = "";
+    if (obj.date) {
+      const dt = new Date(obj.date);
+      if (!isNaN(dt.getTime())) {
+        dDate = `${months[dt.getMonth()]} ${dt.getDate()}, ${dt.getFullYear()}`;
+      }
     }
-    x.isPCP = isPCPSlot(x);
-    return x;
+
+    return {
+      ...obj,
+      dDate,
+      isPCP: isPCPSlot(obj)
+    };
   });
+
+  // Sort safely by date
+  normalized.sort((a, b) => {
+    const aT = a.date ? new Date(a.date).getTime() : 0;
+    const bT = b.date ? new Date(b.date).getTime() : 0;
+    return aT - bT;
+  });
+
+  return normalized;
 }
 
 function errorPage(res, err) {
