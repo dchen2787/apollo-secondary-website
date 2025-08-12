@@ -245,7 +245,6 @@ app.post("/login", function(req,res){
   });
 });
 
-// Admin login
 app.post("/admin-login", function(req, res) {
   const email = _.toLower(req.body.email);
   const password = req.body.password;
@@ -258,13 +257,13 @@ app.post("/admin-login", function(req, res) {
       if (err) return res.render("admin-login", { errM: "An error occurred. Please try again." });
       if (!ok) return res.render("admin-login", { errM: "Incorrect password." });
 
-      Slot.find(function(err, slots) {
+      // IMPORTANT: use .lean() so the view receives plain JS objects
+      Slot.find({}).lean().exec(function(err, slots) {
         if (err) return errorPage(res, err);
 
-        // add display helpers (dDate, isPCP) and sort
-        const array = setDisplayValues(slots);
+        const array = setDisplayValues(slots); // now robust even if .lean() is missed elsewhere
 
-        Confirm.find(function(err, confirms) {
+        Confirm.find({}).lean().exec(function(err, confirms) {
           if (err) return errorPage(res, err);
 
           res.render("admin-home", {
