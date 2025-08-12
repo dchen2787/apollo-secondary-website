@@ -3,7 +3,7 @@
 <style>
   .page-hero { display:flex; align-items:center; gap:14px; margin:18px 0 8px; }
   .avatar { width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#eef4ff;color:#3353d1;font-weight:700; }
-  .badge-soft {background:#dbeafe; color:#1e3a8a; border-radius:999px; padding:4px 12px; font-size:14px; font-weight:600; display:inline-block;}
+  .badge-soft { background:#dbeafe; color:#1e3a8a; border-radius:999px; padding:4px 12px; font-size:14px; font-weight:600; display:inline-block; }
   .pill-nonpcp { display:inline-block; padding:2px 10px; border-radius:999px; font-size:12px; background:#fef3c7; color:#92400e; }
   .slot-card { border-radius:18px; padding:14px; background:#fff; margin-bottom:12px; box-shadow:0 4px 12px rgba(0,0,0,.07); }
   .slot-card .head { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
@@ -11,45 +11,55 @@
   .btn-soft { background:#111827; color:#fff; border:none; border-radius:12px; padding:8px 14px; }
   .btn-soft[disabled] { opacity:.55; cursor:not-allowed; }
   .btn-ghost { background:#f3f4f6; border:none; border-radius:12px; padding:8px 14px; }
+
+  /* Alerts */
   .alert { position:relative; border-radius:14px; padding:10px 40px 10px 12px; margin:8px 0; }
   .alert-info { background:#eff6ff; color:#1d4ed8; }
   .alert-success { background:#ecfdf5; color:#065f46; }
   .alert-warning { background:#fff7ed; color:#9a3412; }
   .alert .close { position:absolute; right:10px; top:8px; background:transparent; border:0; font-size:20px; line-height:1; color:inherit; opacity:.6; }
-  .controls-box { background:#f9fafb; padding:14px; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,0.06); display:flex; gap:14px; flex-wrap:wrap; justify-content:center; }
-  .searchbar { border-radius:12px; border:1px solid #e5e7eb; padding:10px 12px; width:100%; max-width:420px; }
+
+  /* Locked banner (separate + not closable) */
+  .lock-banner-wrap { margin:18px 0; }
+  .lock-banner { border-radius:16px; padding:14px 16px; background:#fff7ed; color:#9a3412; border:1px solid #fcd49b; }
+
+  /* Filter panel */
+  .filter-card { background:#ffffff; border:1px solid #e5e7eb; box-shadow:0 8px 24px rgba(0,0,0,.06); border-radius:16px; padding:16px; margin:14px 0 18px; }
+  .filter-head { font-weight:600; color:#374151; margin-bottom:10px; }
+  .controls { display:flex; gap:16px; flex-wrap:wrap; align-items:center; justify-content:center; }
+  .searchbar { border-radius:12px; border:1px solid #e5e7eb; padding:10px 12px; width:100%; max-width:520px; }
   .dropdown .dropdown-menu { max-height:260px; overflow:auto; }
+  .dropdown-toggle { border-radius:12px; padding:10px 14px; border:1px solid #e5e7eb; background:#f9fafb; }
+  .dropdown-toggle:after { margin-left:8px; }
+  #specHint { text-align:center; width:100%; }
   label.checkbox { display:flex; align-items:center; gap:8px; }
-  #specDropdown { min-width:240px; }
+
+  /* Section spacing */
+  .section-title { margin:20px 0 8px; }
 </style>
 
 <div class="container">
 
+  <% /* --- NON-CLOSABLE MATCH-LOCKED BANNER (separate) --- */ %>
+  <% if (controls && controls.matchingLocked) { %>
+    <div class="lock-banner-wrap">
+      <div class="lock-banner">
+        Matching is currently locked. You can review your matches but cannot add new ones.
+        Your matches are locked at this time. If you have any questions or concerns, please contact apolloyimde@gmail.com.
+      </div>
+    </div>
+  <% } %>
+
+  <% /* Other alerts remain closable */ %>
   <% if (errM && errM.length) { %>
     <div class="alert alert-info">
       <%= errM %>
       <button type="button" class="close" aria-label="Close">&times;</button>
     </div>
   <% } %>
-
-  <% if (controls && controls.matchingLocked) { %>
-    <div class="alert alert-warning">
-      Matching is currently locked. You can review your matches but cannot add new ones.  
-      Your matches are locked at this time. If you have any questions or concerns, please contact apolloyimde@gmail.com.
-      <button type="button" class="close" aria-label="Close">&times;</button>
-    </div>
-  <% } %>
-
-  <% if (confirmed) { %>
-    <div class="alert alert-success">
-      You have confirmed your slots.
-      <button type="button" class="close" aria-label="Close">&times;</button>
-    </div>
-  <% } %>
-
   <% if (controls && controls.PCPonly) { %>
     <div class="alert alert-info">
-      PCP-only mode is ON. You can only claim primary-care slots right now.
+      PCP‑only mode is ON. You can only claim primary‑care slots right now.
       <button type="button" class="close" aria-label="Close">&times;</button>
     </div>
   <% } %>
@@ -75,12 +85,14 @@
   </div>
 
   <!-- Your matches -->
-  <h2 style="margin:16px 0 8px;">Your Matches</h2>
+  <h2 class="section-title">Your Matches</h2>
   <%
     const mySlots = (slots || []).filter(s => s.studentEmail === user.email);
     if (mySlots.length === 0) { %>
       <div class="muted" style="margin-bottom:12px;">You haven’t claimed any slots yet.</div>
   <% } %>
+
+  <% const PCPonly = !!(controls && controls.PCPonly); %>
 
   <% mySlots.forEach(function(slot){
        const isPCP = ['Family Medicine (PCP)','Primary Care'].includes((slot.physSpecialty||'').trim());
@@ -89,96 +101,89 @@
       <div class="head">
         <strong><%= slot.physName || '—' %></strong>
         <% if (slot.physSpecialty) { %><span class="badge-soft"><%= slot.physSpecialty %></span><% } %>
-        <% if ((controls && controls.PCPonly) && !isPCP && slot.physSpecialty) { %>
-          <span class="pill-nonpcp">Non-PCP</span>
-        <% } %>
+        <% if (PCPonly && slot.physSpecialty && !isPCP) { %><span class="pill-nonpcp">Non‑PCP</span><% } %>
       </div>
       <div class="muted" style="margin:6px 0;">
         <strong><%= slot.dDate || '-' %></strong> • <%= (slot.timeStart || '-') %> to <%= (slot.timeEnd || '-') %> • <%= slot.location || '-' %>
       </div>
       <div class="muted"><%= (slot.notes && slot.notes.trim()) ? slot.notes : '—' %></div>
 
-      <% if (!(controls && controls.matchingLocked)) { %>
-        <div style="margin-top:10px;">
+      <div style="margin-top:10px;">
+        <% if (!(controls && controls.matchingLocked)) { %>
           <form action="/unclaim" method="post" style="display:inline;">
             <input type="hidden" name="userEmail" value="<%= user.email %>">
             <input type="hidden" name="slotId" value="<%= slot._id %>">
             <button type="submit" class="btn-ghost">Remove</button>
           </form>
-        </div>
-      <% } %>
+        <% } %>
+      </div>
     </div>
   <% }); %>
 
-  <!-- Phase messages & confirm instructions -->
-  <% if (!(controls && controls.matchingLocked)) { %>
-    <hr /><br />
-    <% if (mySlots.length < maxSlots) { %>
-      <% if (controls && controls.PCPonly === true) { %>
-        <h4>*PCP-only phase is active. You can browse all slots, but you may only claim Primary Care slots right now.</h4>
-      <% } else if (maxSlots === 2) { %>
-        <h4>*You may claim up to 2 slots for this phase of the Match. Any matches listed above are saved and Apollo will confirm your slots via email after the Match period.</h4>
-      <% } else { %>
-        <h4>*You may claim an unlimited number of slots at this time. Any matches listed above are saved and Apollo will confirm your slots via email after the Match period.</h4>
-      <% } %>
-    <% } else { %>
-      <% if (maxSlots === 2) { %>
-        <h4>*You have reached the maximum of 2 slots for this phase of the Match.</h4>
-      <% } else { %>
-        <h4>*You have the maximum number of matches at this time. Your above matches are saved and Apollo will confirm your slots via email after the Match period.</h4>
-      <% } %>
-    <% } %>
-  <% } else { %>
-    <hr /><br />
-    <h5>
-      To confirm that you are willing and able to attend all the slots above, press this button.  
-      Please remember to check date and location information carefully.  
-      If you are unable to attend any of the slots above or have any questions about your slots,  
-      instead contact the Apollo Team via email immediately.
-    </h5>
+  <% /* --- Move the CONFIRMED message here, under the list --- */ %>
+  <% if (confirmed) { %>
+    <div class="alert alert-success" style="margin-top:10px;">
+      You have confirmed your slots.
+      <button type="button" class="close" aria-label="Close">&times;</button>
+    </div>
   <% } %>
 
-  <!-- Browse with filters: hidden if matching is locked -->
-  <% if (!(controls && controls.matchingLocked)) { %>
-    <h2 style="margin:20px 0 8px;">Browse Slots</h2>
+  <% /* Guidance only on locked/confirm state */ %>
+  <% if (controls && controls.matchingLocked) { %>
+    <hr />
+    <p style="font-size:20px; line-height:1.35; margin:16px 0 8px;">
+      To confirm that you are willing and able to attend all the slots above, press this button.
+      Please remember to check date and location information carefully. If you are unable to attend any of the slots above
+      or have any questions about your slots, instead contact the Apollo Team via email immediately.
+    </p>
+  <% } %>
+
+  <% const matchingLocked = !!(controls && controls.matchingLocked); %>
+
+  <!-- Browse with filters (hidden when locked) -->
+  <% if (!matchingLocked) { %>
+    <h2 class="section-title">Browse Slots</h2>
 
     <%
       const specsSet = new Set((slots || []).map(s => (s.physSpecialty || '').trim()).filter(Boolean));
       const specialties = Array.from(specsSet).sort();
-      const PCPonly = !!(controls && controls.PCPonly);
     %>
 
-    <div class="controls-box" style="margin-bottom:20px;">
-      <input id="search" class="searchbar" placeholder="Search by physician, specialty, location, or notes…">
+    <div class="filter-card">
+      <div class="filter-head">Search and filter</div>
+      <div class="controls">
+        <input id="search" class="searchbar" placeholder="Search by physician, specialty, location, or notes…">
 
-      <div class="dropdown">
-        <button class="btn-ghost dropdown-toggle" type="button" id="specDropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-          Specialties (multi-select)
-        </button>
-        <div class="dropdown-menu p-2" aria-labelledby="specDropdown">
-          <label class="dropdown-item">
-            <input type="checkbox" id="specAll" checked> <strong>All specialties</strong>
-          </label>
-          <div class="dropdown-divider"></div>
-          <% specialties.forEach(function(sp){ %>
+        <!-- Multi-select dropdown -->
+        <div class="dropdown">
+          <button class="dropdown-toggle" type="button" id="specDropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+            Specialties (multi‑select)
+          </button>
+          <div class="dropdown-menu p-2" aria-labelledby="specDropdown">
             <label class="dropdown-item">
-              <input type="checkbox" class="spec-option" value="<%= sp %>"> <%= sp %>
+              <input type="checkbox" id="specAll" checked> <strong>All specialties</strong>
             </label>
-          <% }); %>
+            <div class="dropdown-divider"></div>
+            <% specialties.forEach(function(sp){ %>
+              <label class="dropdown-item">
+                <input type="checkbox" class="spec-option" value="<%= sp %>"> <%= sp %>
+              </label>
+            <% }); %>
+          </div>
+          <div class="muted" id="specHint" style="font-size:12px; margin-top:2px;">All specialties selected</div>
         </div>
-        <div class="muted" id="specHint" style="font-size:12px; margin-top:2px;">All specialties selected</div>
-      </div>
 
-      <label class="checkbox">
-        <input id="onlyOpen" type="checkbox" checked>
-        <span>Only show not claimed</span>
-      </label>
+        <label class="checkbox">
+          <input id="onlyOpen" type="checkbox" checked>
+          <span>Only show not claimed</span>
+        </label>
+      </div>
     </div>
 
     <div id="slotList">
       <% (slots || []).forEach(function(slot){
-           const isPCP = ['Family Medicine (PCP)','Primary Care'].includes((slot.physSpecialty||'').trim());
-           const claimDisabledReason = PCPonly && !isPCP ? "PCP-only is active." : null;
+           const isPCP2 = ['Family Medicine (PCP)','Primary Care'].includes((slot.physSpecialty||'').trim());
+           const claimDisabledReason = (controls && controls.PCPonly && !isPCP2) ? "PCP‑only is active." : null;
            const claimedState = slot.studentEmail ? (slot.studentEmail === user.email ? "me" : "other") : "no";
       %>
         <div class="slot-card searchable"
@@ -188,9 +193,7 @@
           <div class="head">
             <strong><%= slot.physName || '—' %></strong>
             <% if (slot.physSpecialty) { %><span class="badge-soft"><%= slot.physSpecialty %></span><% } %>
-            <% if ((controls && controls.PCPonly) && !isPCP && slot.physSpecialty) { %>
-              <span class="pill-nonpcp">Non-PCP</span>
-            <% } %>
+            <% if ((controls && controls.PCPonly) && slot.physSpecialty && !isPCP2) { %><span class="pill-nonpcp">Non‑PCP</span><% } %>
           </div>
 
           <div class="muted" style="margin:6px 0;">
@@ -215,7 +218,12 @@
               <% } %>
             <% } else { %>
               <% if (slot.studentEmail === user.email) { %>
-                <span class="muted">Claimed by you</span>
+                <form action="/unclaim" method="post" style="display:inline;">
+                  <input type="hidden" name="userEmail" value="<%= user.email %>">
+                  <input type="hidden" name="slotId" value="<%= slot._id %>">
+                  <button type="submit" class="btn-ghost">Remove</button>
+                </form>
+                <span class="muted" style="margin-left:8px;">Claimed by you</span>
               <% } else { %>
                 <span class="muted">Taken</span>
               <% } %>
@@ -229,6 +237,7 @@
 </div>
 
 <script>
+  // Dismiss closable alerts
   document.querySelectorAll('.alert .close').forEach(btn => {
     btn.addEventListener('click', () => btn.closest('.alert')?.remove());
   });
@@ -238,6 +247,7 @@
     const onlyOpen = document.getElementById('onlyOpen');
     const cards = Array.from(document.querySelectorAll('#slotList .slot-card'));
 
+    // keep dropdown open when clicking inside
     document.querySelectorAll('.dropdown-menu').forEach(menu => {
       menu.addEventListener('click', e => e.stopPropagation());
     });
@@ -249,7 +259,6 @@
     function selectedSpecs(){
       return specChecks.filter(c => c.checked).map(c => c.value);
     }
-
     function updateSpecHint(){
       const picked = specChecks.filter(c => c.checked).length;
       if (specAll.checked || picked === 0 || picked === specChecks.length) {
@@ -258,7 +267,6 @@
         specHint.textContent = picked + ' specialty(ies) selected';
       }
     }
-
     function matches(card){
       const query = (q?.value || '').toLowerCase().trim();
       if (query && !(card.dataset.search || '').includes(query)) return false;
@@ -271,10 +279,7 @@
 
       return true;
     }
-
-    function apply(){
-      cards.forEach(c => { c.style.display = matches(c) ? '' : 'none'; });
-    }
+    function apply(){ cards.forEach(c => { c.style.display = matches(c) ? '' : 'none'; }); }
 
     q?.addEventListener('input', apply);
     onlyOpen?.addEventListener('change', apply);
@@ -293,13 +298,9 @@
   })();
 </script>
 
+<!-- Bootstrap (optional, used for dropdown styles if you rely on BS elsewhere) -->
 <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
 <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
-<script>
- $(function () {
-   $('#specDropdown').dropdown();
- });
-</script>
 
 <%- include("./partials/footer"); -%>
