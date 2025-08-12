@@ -19,19 +19,19 @@
       <hr />
       <div class="row">
         <div class="col-12 col-md-9">
-          <%= slot.physName %>, <%=slot.physSpecialty %> <br />
+          <%= slot.physName %>, <%= slot.physSpecialty %> <br />
           <%= slot.dDate %>, <%= slot.timeStart %> to <%= slot.timeEnd %> <br />
           <%= slot.location %> <br />
-          <% if(slot.notes){ %>
-          <p class="italics">Notes: <%= slot.notes %><br /></p>
-          <% }%>
+          <% if (slot.notes) { %>
+            <p class="italics">Notes: <%= slot.notes %></p>
+          <% } %>
         </div>
         <div class="col-12 col-md-3">
           <form action="/unclaim" method="post">
-            <input type="hidden" name="userEmail" value="<%=user.email%>">
-            <input type="hidden" name="slotId" value="<%=slot._id%>">
+            <input type="hidden" name="userEmail" value="<%= user.email %>">
+            <input type="hidden" name="slotId" value="<%= slot._id %>">
             <br/>
-            <button type="submit" name="button" class="btn">Remove</button>
+            <button type="submit" class="btn">Remove</button>
           </form>
         </div>
       </div>
