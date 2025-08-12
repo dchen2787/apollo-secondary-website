@@ -362,33 +362,16 @@
 </script>
 <%- include("./partials/footer"); -%>
 -->
-
 <%- include("./partials/header"); -%>
 
 <style>
-  /* quick, lightweight polish */
   .page-hero { display:flex; align-items:center; gap:14px; margin:18px 0 8px; }
-  .avatar {
-    width:44px;height:44px;border-radius:50%;
-    display:flex;align-items:center;justify-content:center;
-    background:#eef4ff;color:#3353d1;font-weight:700;
-  }
-  .kpi { border-radius:16px; padding:14px; box-shadow:0 6px 14px rgba(0,0,0,.06); background:#fff; }
-  .kpi h3 { font-size:14px; margin:0; color:#6b7280; }
-  .kpi .v { font-size:22px; font-weight:800; margin-top:4px; }
+  .avatar { width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#eef4ff;color:#3353d1;font-weight:700; }
   .badge-soft { background:#eef2ff; color:#3730a3; border-radius:999px; padding:2px 10px; font-size:12px; }
-  .slot-card {
-    border-radius:18px; padding:14px; background:#fff; margin-bottom:12px;
-    box-shadow:0 4px 12px rgba(0,0,0,.07);
-  }
+  .pill-nonpcp { display:inline-block; padding:2px 10px; border-radius:999px; font-size:12px; background:#fef3c7; color:#92400e; }
+  .slot-card { border-radius:18px; padding:14px; background:#fff; margin-bottom:12px; box-shadow:0 4px 12px rgba(0,0,0,.07); }
   .slot-card .head { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
   .muted { color:#6b7280; }
-  .pill { display:inline-block; padding:2px 10px; border-radius:999px; font-size:12px; }
-  .pill-pcp { background:#ecfdf5; color:#065f46; }
-  .pill-nonpcp { background:#fef3c7; color:#92400e; }
-  .section-title { margin:22px 0 8px; display:flex; align-items:center; justify-content:space-between; }
-  .searchbar { border-radius:12px; border:1px solid #e5e7eb; padding:10px 12px; width:100%; }
-  .sticky-actions { position:sticky; top:10px; z-index:2; }
   .btn-soft { background:#111827; color:#fff; border:none; border-radius:12px; padding:8px 14px; }
   .btn-soft[disabled] { opacity:.55; cursor:not-allowed; }
   .btn-ghost { background:#f3f4f6; border:none; border-radius:12px; padding:8px 14px; }
@@ -396,12 +379,14 @@
   .alert-info { background:#eff6ff; color:#1d4ed8; }
   .alert-success { background:#ecfdf5; color:#065f46; }
   .alert-warning { background:#fff7ed; color:#9a3412; }
-  .alert-danger { background:#fef2f2; color:#b91c1c; }
+  .controls { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  .searchbar { border-radius:12px; border:1px solid #e5e7eb; padding:10px 12px; width:100%; max-width:420px; }
+  select[multiple] { min-width:220px; min-height:110px; border-radius:10px; border:1px solid #e5e7eb; padding:8px; }
+  label.checkbox { display:flex; align-items:center; gap:8px; }
 </style>
 
 <div class="container">
 
-  <!-- Top notices -->
   <% if (errM && errM.length) { %>
     <div class="alert alert-info"><%= errM %></div>
   <% } %>
@@ -430,7 +415,7 @@
     </div>
     <div style="margin-left:auto;">
       <% if (!confirmed) { %>
-        <form action="/confirm" method="post" class="sticky-actions">
+        <form action="/confirm" method="post">
           <input type="hidden" name="userEmail" value="<%= user.email %>">
           <button class="btn-soft">Confirm My Slots</button>
         </form>
@@ -438,56 +423,25 @@
     </div>
   </div>
 
-  <!-- KPIs -->
-  <% 
-    let myClaimed = 0; 
-    let totalAvailable = 0;
-    (slots || []).forEach(s => {
-      if (!s.studentEmail) totalAvailable++;
-      if (s.studentEmail && s.studentEmail === user.email) myClaimed++;
-    });
-    const maxAllowed = (typeof maxSlots !== "undefined" && maxSlots !== null) ? maxSlots : 100;
-  %>
-
-  <div class="row" style="gap:14px; margin:12px 0;">
-    <div class="kpi col">
-      <h3>Claimed</h3>
-      <div class="v"><%= myClaimed %> / <%= maxAllowed %></div>
-    </div>
-    <div class="kpi col">
-      <h3>Available Slots</h3>
-      <div class="v"><%= totalAvailable %></div>
-    </div>
-    <div class="kpi col">
-      <h3>Status</h3>
-      <div class="v">
-        <% if (confirmed) { %>Confirmed<% } else { %>Not confirmed<% } %>
-      </div>
-    </div>
-  </div>
-
-  <!-- Your matches -->
-  <div class="section-title">
-    <h2>Your Matches</h2>
-  </div>
-
-  <% 
+  <!-- Your matches (unchanged) -->
+  <h2 style="margin:16px 0 8px;">Your Matches</h2>
+  <%
     const mySlots = (slots || []).filter(s => s.studentEmail === user.email);
     if (mySlots.length === 0) { %>
       <div class="muted" style="margin-bottom:12px;">You haven’t claimed any slots yet.</div>
   <% } %>
 
-  <% mySlots.forEach(function(slot){ %>
+  <% mySlots.forEach(function(slot){ 
+       const isPCP = ['Family Medicine (PCP)','Primary Care'].includes((slot.physSpecialty||'').trim());
+  %>
     <div class="slot-card">
       <div class="head">
         <strong><%= slot.physName || '—' %></strong>
         <% if (slot.physSpecialty) { %>
           <span class="badge-soft"><%= slot.physSpecialty %></span>
-          <% if (['Family Medicine (PCP)','Primary Care'].includes((slot.physSpecialty||'').trim())) { %>
-            <span class="pill pill-pcp">PCP</span>
-          <% } else { %>
-            <span class="pill pill-nonpcp">Non‑PCP</span>
-          <% } %>
+        <% } %>
+        <% if (!isPCP && slot.physSpecialty) { %>
+          <span class="pill-nonpcp">Non‑PCP</span>
         <% } %>
       </div>
       <div class="muted" style="margin:6px 0;">
@@ -505,94 +459,132 @@
     </div>
   <% }); %>
 
-  <!-- Search + Available -->
-  <div class="section-title">
-    <h2>Available Slots</h2>
-    <input id="search" class="searchbar" placeholder="Search by physician, specialty, location, or notes…">
-  </div>
+  <!-- Browse with filters -->
+  <h2 style="margin:20px 0 8px;">Browse Slots</h2>
 
-  <% 
-    const canClaimMore = myClaimed < maxAllowed;
+  <%
+    // Build unique specialties list
+    const specsSet = new Set((slots || []).map(s => (s.physSpecialty || '').trim()).filter(Boolean));
+    const specialties = Array.from(specsSet).sort();
     const matchingLocked = !!(controls && controls.matchingLocked);
     const PCPonly = !!(controls && controls.PCPonly);
   %>
 
-  <% (slots || []).filter(s => !s.studentEmail).forEach(function(slot){ 
-       const isPCP = ['Family Medicine (PCP)','Primary Care'].includes((slot.physSpecialty||'').trim());
-       const claimDisabledReason =
-         confirmed ? "You have already confirmed."
-       : matchingLocked ? "Matching is locked."
-       : PCPonly && !isPCP ? "PCP‑only is active."
-       : !canClaimMore ? "You reached your max."
-       : null;
-  %>
-    <div class="slot-card searchable"
-         data-search="<%= [slot.physName, slot.physSpecialty, slot.location, slot.notes].filter(Boolean).join(' ').toLowerCase() %>">
-      <div class="head">
-        <strong><%= slot.physName || '—' %></strong>
-        <% if (slot.physSpecialty) { %>
-          <span class="badge-soft"><%= slot.physSpecialty %></span>
-          <% if (isPCP) { %><span class="pill pill-pcp">PCP</span><% } else { %><span class="pill pill-nonpcp">Non‑PCP</span><% } %>
-        <% } %>
-      </div>
-      <div class="muted" style="margin:6px 0;">
-        <strong><%= slot.dDate || '-' %></strong> • <%= (slot.timeStart || '-') %> to <%= (slot.timeEnd || '-') %> • <%= slot.location || '-' %>
-      </div>
-      <div class="muted"><%= (slot.notes && slot.notes.trim()) ? slot.notes : '—' %></div>
-
-      <div style="margin-top:10px;">
-        <form action="/claim" method="post" style="display:inline;">
-          <input type="hidden" name="userEmail" value="<%= user.email %>">
-          <input type="hidden" name="userFName" value="<%= user.fName %>">
-          <input type="hidden" name="userLName" value="<%= user.lName %>">
-          <input type="hidden" name="slotId" value="<%= slot._id %>">
-          <button type="submit" class="btn-soft"
-            <% if (claimDisabledReason) { %> disabled title="<%= claimDisabledReason %>" <% } %>>
-            Claim
-          </button>
-        </form>
-        <% if (claimDisabledReason) { %>
-          <span class="muted" style="margin-left:8px;"><%= claimDisabledReason %></span>
-        <% } %>
-      </div>
+  <div class="controls" style="margin-bottom:10px;">
+    <input id="search" class="searchbar" placeholder="Search by physician, specialty, location, or notes…">
+    <div>
+      <label class="muted" style="display:block; font-size:12px; margin-bottom:4px;">Filter by specialty</label>
+      <select id="specFilter" multiple>
+        <% specialties.forEach(function(sp){ %>
+          <option value="<%= sp %>"><%= sp %></option>
+        <% }); %>
+      </select>
     </div>
-  <% }); %>
+    <label class="checkbox">
+      <input id="onlyOpen" type="checkbox" checked>
+      <span>Only show not claimed</span>
+    </label>
+  </div>
 
-  <!-- Taken (collapsed) -->
-  <details style="margin-top:18px;">
-    <summary class="muted">Show taken slots</summary>
-    <div style="margin-top:10px;">
-      <% (slots || []).filter(s => s.studentEmail && s.studentEmail !== user.email).forEach(function(slot){ %>
-        <div class="slot-card">
-          <div class="head">
-            <strong><%= slot.physName || '—' %></strong>
-            <% if (slot.physSpecialty) { %><span class="badge-soft"><%= slot.physSpecialty %></span><% } %>
-          </div>
-          <div class="muted" style="margin:6px 0;">
-            <strong><%= slot.dDate || '-' %></strong> • <%= (slot.timeStart || '-') %> to <%= (slot.timeEnd || '-') %> • <%= slot.location || '-' %>
-          </div>
-          <div class="muted"><%= (slot.notes && slot.notes.trim()) ? slot.notes : '—' %></div>
-          <div class="muted" style="margin-top:6px;">Taken</div>
+  <div id="slotList">
+    <% (slots || []).forEach(function(slot){ 
+         const isPCP = ['Family Medicine (PCP)','Primary Care'].includes((slot.physSpecialty||'').trim());
+         const claimDisabledReason =
+           confirmed ? "You have already confirmed."
+         : matchingLocked ? "Matching is locked."
+         : PCPonly && !isPCP ? "PCP‑only is active."
+         : null;
+
+         const claimedState =
+           slot.studentEmail ? (slot.studentEmail === user.email ? "me" : "other") : "no";
+    %>
+      <div class="slot-card searchable"
+           data-search="<%= [slot.physName, slot.physSpecialty, slot.location, slot.notes].filter(Boolean).join(' ').toLowerCase() %>"
+           data-spec="<%= (slot.physSpecialty||'').trim() %>"
+           data-claimed="<%= claimedState %>">
+        <div class="head">
+          <strong><%= slot.physName || '—' %></strong>
+          <% if (slot.physSpecialty) { %>
+            <span class="badge-soft"><%= slot.physSpecialty %></span>
+          <% } %>
+          <% if (!isPCP && slot.physSpecialty) { %>
+            <span class="pill-nonpcp">Non‑PCP</span>
+          <% } %>
         </div>
-      <% }); %>
-    </div>
-  </details>
+
+        <div class="muted" style="margin:6px 0;">
+          <strong><%= slot.dDate || '-' %></strong> • <%= (slot.timeStart || '-') %> to <%= (slot.timeEnd || '-') %> • <%= slot.location || '-' %>
+        </div>
+        <div class="muted"><%= (slot.notes && slot.notes.trim()) ? slot.notes : '—' %></div>
+
+        <div style="margin-top:10px;">
+          <% if (!slot.studentEmail) { %>
+            <form action="/claim" method="post" style="display:inline;">
+              <input type="hidden" name="userEmail" value="<%= user.email %>">
+              <input type="hidden" name="userFName" value="<%= user.fName %>">
+              <input type="hidden" name="userLName" value="<%= user.lName %>">
+              <input type="hidden" name="slotId" value="<%= slot._id %>">
+              <button type="submit" class="btn-soft"
+                <% if (claimDisabledReason) { %> disabled title="<%= claimDisabledReason %>" <% } %>>
+                Claim
+              </button>
+            </form>
+            <% if (claimDisabledReason) { %>
+              <span class="muted" style="margin-left:8px;"><%= claimDisabledReason %></span>
+            <% } %>
+          <% } else { %>
+            <% if (slot.studentEmail === user.email) { %>
+              <form action="/unclaim" method="post" style="display:inline;">
+                <input type="hidden" name="userEmail" value="<%= user.email %>">
+                <input type="hidden" name="slotId" value="<%= slot._id %>">
+                <button type="submit" class="btn-ghost">Remove</button>
+              </form>
+              <span class="muted" style="margin-left:8px;">Claimed by you</span>
+            <% } else { %>
+              <span class="muted">Taken</span>
+            <% } %>
+          <% } %>
+        </div>
+      </div>
+    <% }); %>
+  </div>
 
 </div>
 
 <script>
-  // simple client-side search
   (function(){
     const q = document.getElementById('search');
-    if (!q) return;
-    const items = Array.from(document.querySelectorAll('.searchable'));
-    q.addEventListener('input', function(){
-      const val = (q.value || '').toLowerCase().trim();
-      items.forEach(el => {
-        const hay = el.getAttribute('data-search') || '';
-        el.style.display = hay.includes(val) ? '' : 'none';
-      });
-    });
+    const spec = document.getElementById('specFilter');
+    const onlyOpen = document.getElementById('onlyOpen');
+    const cards = Array.from(document.querySelectorAll('#slotList .slot-card'));
+
+    function getSelectedSpecs(){
+      return Array.from(spec.selectedOptions || []).map(o => o.value);
+    }
+
+    function matchesFilters(card){
+      const query = (q.value || '').toLowerCase().trim();
+      const hay = (card.getAttribute('data-search') || '');
+      if (query && !hay.includes(query)) return false;
+
+      const selected = getSelectedSpecs();
+      const s = card.getAttribute('data-spec') || '';
+      if (selected.length && !selected.includes(s)) return false;
+
+      const claimed = card.getAttribute('data-claimed');
+      if (onlyOpen.checked && claimed !== 'no') return false;
+
+      return true;
+    }
+
+    function apply(){
+      cards.forEach(c => { c.style.display = matchesFilters(c) ? '' : 'none'; });
+    }
+
+    q.addEventListener('input', apply);
+    spec.addEventListener('change', apply);
+    onlyOpen.addEventListener('change', apply);
+    apply(); // initial
   })();
 </script>
 
