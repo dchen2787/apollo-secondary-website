@@ -273,9 +273,12 @@ async function renderHome(res, userEmail, errM = "") {
 }
 
 // Build admin analytics (per-student hours, by-school totals)
-function buildAdminAnalytics(allSlots, allStudents, lyteOnly = false) {
+function buildAdminAnalytics(allSlots, allStudents, lyteOnly = false, includeArchived = false) {
+  // Optionally exclude archived students
+  const students = includeArchived ? allStudents : (allStudents || []).filter(s => !s.archived);
+
   const byEmail = {};
-  allStudents.forEach(st => {
+  students.forEach(st => {
     const email = (st.email || "").toLowerCase();
     if (!email) return;
     byEmail[email] = {
@@ -283,6 +286,7 @@ function buildAdminAnalytics(allSlots, allStudents, lyteOnly = false) {
       email,
       school: st.school || "",
       isLyte: !!st.isLyte,
+      archived: !!st.archived,
       hours: 0
     };
   });
