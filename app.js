@@ -318,8 +318,7 @@ function buildAdminAnalytics(allSlots, allStudents, lyteOnly = false, includeArc
   return { studentHours, hoursBySchool };
 }
 
-// Single place to render admin dashboard
-async function renderAdminHome(res, flashMsg = "", lyteOnly = false) {
+async function renderAdminHome(res, flashMsg = "", lyteOnly = false, includeArchived = false) {
   try {
     const [slots, confirms, ctrl, students] = await Promise.all([
       Slot.find({}).lean(),
@@ -329,11 +328,11 @@ async function renderAdminHome(res, flashMsg = "", lyteOnly = false) {
     ]);
     const array = setDisplayValues(slots);
 
-    const { studentHours, hoursBySchool } = buildAdminAnalytics(slots, students, lyteOnly);
+    const { studentHours, hoursBySchool } = buildAdminAnalytics(slots, students, lyteOnly, includeArchived);
 
-    // NEW: archive buckets
-    const activeStudents = students.filter(s => !s.archived);
-    const archivedStudents = students.filter(s => s.archived);
+    // Archive counts for quick context
+    const activeCount   = (students || []).filter(s => !s.archived).length;
+    const archivedCount = (students || []).filter(s =>  s.archived).length;
 
     res.render("admin-home", {
       slots: array,
@@ -344,9 +343,10 @@ async function renderAdminHome(res, flashMsg = "", lyteOnly = false) {
       studentHours,
       hoursBySchool,
       lyteOnly,
-      activeCount: activeStudents.length,
-      archivedCount: archivedStudents.length,
-      archivedStudents // for archive section
+      includeArchived,   // NEW -> view knows which state we’re in
+      activeCount,
+      archivedCount,
+      archivedStudents: students.filter(s => s.archived) // for archive section you already added
     });
   } catch (e) {
     return errorPage(res, e);
@@ -458,7 +458,8 @@ app.get("/", function(req,res){
 });
 app.get("/admin", function(req,res){
   const lyteOnly = String(req.query.lyte || "").toLowerCase() === "true";
-  return renderAdminHome(res, "", lyteOnly);
+  const includeArchived = ["true","1","yes","y"].includes(String(req.query.archived || "").toLowerCase());
+  return renderAdminHome(res, "", lyteOnly, includeArchived);
 });
 app.get("/admin-login", function(req,res){
   res.render("admin-login", {errM:""});
