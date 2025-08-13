@@ -1,24 +1,90 @@
 <%- include("./partials/header"); -%>
-<div id="login-page">
-<h1>Student Login</h1>
-<div id="login-container" class="container">
-  <div class="row">
-    
-    <div class="col col-12 col-md-6">
-      <div class="login-card">
-        <h2>Log In</h2>
-        <h3><%=errM2%></h3>
-        <form class="" action="/login" method="post">
-          <input class="top-input" type="email" name="email" value="" placeholder="Email" required=true><br/>
-          <input class="btm-input" type="password" name="password" value="" placeholder="Password" required=true>
-          <br />
-          <button type="submit" name="button" class="btn">Submit</button>
-        </form>
+
+<style>
+  :root{ --ring:#e5e7eb; --ok:#0ea5e9; --ink:#0f172a; --muted:#64748b; }
+  body { background: linear-gradient(180deg, #eef2ff, #f8fafc); }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 32px 16px 64px; }
+  .back { margin-bottom:16px; }
+  .card {
+    background:#fff; border:1px solid var(--ring); border-radius:18px; overflow:hidden;
+    box-shadow:0 10px 30px rgba(2,6,23,.08);
+    display:grid; grid-template-columns: 1fr; 
+  }
+  @media (min-width: 900px){ .card{ grid-template-columns: 1.1fr .9fr; } }
+  .side {
+    background: radial-gradient(700px 300px at 20% -10%, #dbeafe, transparent), #1d4ed8;
+    color:#fff; padding:28px;
+    display:flex; flex-direction:column; justify-content:space-between;
+  }
+  .side h2 { margin:0 0 10px; font-weight:800; }
+  .side p { opacity:.95; }
+  .main { padding:28px; }
+  .title { font-size:28px; font-weight:800; color:var(--ink); margin:0 0 4px; }
+  .muted { color:var(--muted); margin-bottom:18px; }
+  .form-group{ margin-bottom:14px; }
+  .input {
+    width:100%; border:1px solid var(--ring); border-radius:12px; padding:12px 14px;
+    outline:none;
+  }
+  .input:focus{ border-color:#93c5fd; box-shadow:0 0 0 4px rgba(147,197,253,.35); }
+  .row2 { display:grid; grid-template-columns: 1fr auto; gap:10px; align-items:center; }
+  .btn { border:none; border-radius:12px; padding:12px 14px; font-weight:700; }
+  .btn-primary { background:#111827; color:#fff; }
+  .alert { background:#fef2f2; color:#b91c1c; border:1px solid #fecaca; padding:10px 12px; border-radius:12px; margin-bottom:12px; }
+  .links { display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
+  .links a { color:#1d4ed8; }
+</style>
+
+<div class="wrap">
+  <a class="back" href="/">&larr; Back</a>
+
+  <div class="card">
+    <div class="main">
+      <h1 class="title">Student Login</h1>
+      <p class="muted">Enter the email and password from your activation email.</p>
+
+      <% if (errM2) { %><div class="alert"><%= errM2 %></div><% } %>
+      <% if (errM)  { %><div class="alert"><%= errM  %></div><% } %>
+
+      <form action="/login" method="post" autocomplete="on">
+        <div class="form-group">
+          <label>Email</label>
+          <input class="input" type="email" name="email" required autocomplete="email">
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <div class="row2">
+            <input class="input" id="pw" type="password" name="password" required autocomplete="current-password">
+            <button type="button" class="btn" id="togglePw" aria-controls="pw">Show</button>
+          </div>
+        </div>
+        <button class="btn btn-primary" type="submit">Sign in</button>
+      </form>
+
+      <div class="links">
+        <a href="/activate-account">Need to activate your account?</a>
       </div>
+    </div>
+
+    <div class="side">
+      <div>
+        <h2>Apollo Youth in Medicine</h2>
+        <p>Access your shadowing matches, review details, and confirm participation from your portal.</p>
+      </div>
+      <small>Having trouble? Contact <a style="color:#fff;text-decoration:underline;" href="mailto:apolloyimde@gmail.com">apolloyimde@gmail.com</a></small>
     </div>
   </div>
 </div>
-</div>
 
+<script>
+  const pw = document.getElementById('pw');
+  const toggle = document.getElementById('togglePw');
+  toggle?.addEventListener('click', () => {
+    const show = pw.type === 'password';
+    pw.type = show ? 'text' : 'password';
+    toggle.textContent = show ? 'Hide' : 'Show';
+    pw.focus();
+  });
+</script>
 
 <%- include("./partials/footer"); -%>
