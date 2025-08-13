@@ -216,10 +216,10 @@ updateGroups();
 
 // Pick effective cap based on phase/controls
 function effectiveMaxSlots(ctrl) {
-  if (!ctrl) return defaultMaxSlots;
-  if (ctrl.phase === 2) return 2;
-  if (ctrl.phase === 3) return Number(ctrl.maxSlots || defaultMaxSlots);
-  // phases 0 & 1: show browse rules in UI; no count cap (0 means no new claims for phase 0; phase 1 has PCP restriction)
+  if (!ctrl) return 0;
+  if (ctrl.phase === 2) return 2;         // Phase 2: hard cap at 2
+  if (ctrl.phase === 3) return 0;         // Phase 3: unlimited (no UI cap)
+  // phases 0 & 1: no numeric cap (UI/phase rules handle availability)
   return 0;
 }
 
@@ -597,7 +597,7 @@ app.post("/claim", async function(req,res){
 
     // Enforce caps: phase 2 (2 max) or use ctrl.maxSlots in phase 3
     const myCount = await Slot.countDocuments({ studentEmail: userEmail });
-    const cap = (phase === 2) ? 2 : (phase === 3 ? Number(ctrl.maxSlots || 100) : 0);
+    const cap = (phase === 2) ? 2 : 0; // Phase 2 capped at 2; Phase 3 unlimited
     if (cap > 0 && myCount >= cap) {
       return renderHome(res, userEmail, `You have reached the maximum of ${cap} slot(s) for this phase.`);
     }
