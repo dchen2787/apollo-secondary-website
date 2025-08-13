@@ -1,7 +1,8 @@
 <%- include("./partials/header"); -%>
 
 <style>
-  :root{
+  /* Color palette from your logo */
+  :root {
     --congress-blue: #04488e;
     --danube: #74abdb;
     --iron: #dbdbdc;
@@ -9,91 +10,112 @@
     --bermuda-gray: #6c8cac;
     --wild-sand: #f6f6f6;
     --pigeon-post: #aac6db;
-    --danube2: #64a4d1;
     --rock-blue: #a4b4cc;
     --catskill-white: #ebf4f5;
-
-    --bg1: var(--wild-sand);
-    --bg2: var(--catskill-white);
-    --ink: var(--congress-blue);
-    --muted: var(--bermuda-gray);
-    --brand: var(--congress-blue);
-    --card: #ffffff;
-    --ring: var(--iron);
   }
 
   body {
-    background: radial-gradient(1200px 600px at 20% -10%, var(--bg2), transparent) , var(--bg1);
+    background: var(--wild-sand);
+    color: black;
+    font-family: 'Segoe UI', Tahoma, sans-serif;
   }
 
-  .wrap { max-width: 1100px; margin: 0 auto; padding: 28px 16px 64px; }
-
-  .topbar {
-    display:flex; align-items:center; gap:14px; padding:14px 0 18px; margin-bottom:14px;
-    border-bottom:1px solid var(--ring);
+  .landing-container {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 40px 20px;
+    text-align: center;
   }
-  .title { font-size:38px; font-weight:800; color:var(--ink); }
 
-  .hero { margin: 22px 0 12px; }
-  .hero h1 { font-size:44px; line-height:1.1; margin:0 0 18px; font-weight:800; color:var(--ink); }
-  .subtle { color:var(--muted); margin-top:8px; }
+  .logo {
+    width: 140px;
+    margin-bottom: 20px;
+  }
 
-  .cta { display:flex; flex-direction:column; gap:16px; max-width: 360px; }
+  h1 {
+    font-size: 2.2rem;
+    margin-bottom: 30px;
+    font-weight: 700;
+  }
 
   .btn-xl {
-    display:flex; align-items:center; justify-content:space-between; gap:12px;
-    border:none; border-radius:14px; padding:14px 16px; width:100%;
-    background:var(--card); box-shadow:0 10px 30px rgba(2,6,23,.08);
-    font-weight:700; color:var(--ink); border:1px solid var(--ring);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border: none;
+    border-radius: 14px;
+    padding: 14px 16px;
+    width: 100%;
+    font-weight: 700;
+    color: black;
+    box-shadow: 0 10px 30px rgba(2,6,23,.08);
     transition: transform .04s ease, box-shadow .2s ease, border-color .2s ease;
-  }
-  .btn-xl:hover { transform: translateY(-1px); box-shadow:0 14px 36px rgba(2,6,23,.12); border-color:var(--cadet-blue); }
-
-  .btn-brand { background:linear-gradient(180deg, var(--danube), var(--congress-blue)); color:#fff; border:0; }
-  .btn-ghost { background:var(--catskill-white); }
-  .btn-xl .icon {
-    width:28px;height:28px;border-radius:999px;background:rgba(255,255,255,.25);
-    display:flex;align-items:center;justify-content:center; font-size:18px;
+    font-size: 1.05rem;
+    cursor: pointer;
   }
 
-  @media (min-width: 900px){
-    .grid { display:grid; grid-template-columns: 1.2fr .8fr; gap:36px; align-items:center; }
+  .btn-xl:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 14px 36px rgba(2,6,23,.12);
+  }
+
+  /* Student Login gradient */
+  .btn-apollo {
+    background: linear-gradient(90deg, var(--danube), var(--congress-blue));
+    color: black;
+  }
+  .btn-apollo:hover {
+    background: linear-gradient(90deg, #84bce6, #0559a8);
+  }
+
+  /* Secondary buttons */
+  .btn-secondary {
+    background: var(--catskill-white);
+    border: 1px solid var(--iron);
+  }
+  .btn-secondary:hover {
+    background: var(--pigeon-post);
+  }
+
+  .btn-wrapper {
+    margin-bottom: 16px;
+  }
+
+  .icon {
+    font-size: 1.2em;
   }
 </style>
 
-<div class="wrap">
-  <div class="topbar">
-    <div class="title">The Match</div>
+<div class="landing-container">
+  <img src="/images/apollo logo.jpeg" alt="Apollo Logo" class="logo">
+  <h1>Welcome to Apollo's Match Portal!</h1>
+
+  <div class="btn-wrapper">
+    <form action="/login" method="get">
+      <button class="btn-xl btn-apollo" type="submit">
+        Student Login
+        <span class="icon">➜</span>
+      </button>
+    </form>
   </div>
 
-  <div class="grid">
-    <div class="hero">
-      <h1>Welcome to Apollo’s Match Portal!</h1>
-      <p class="subtle">Log in or activate your account to view and manage shadowing slots.</p>
-    </div>
+  <div class="btn-wrapper">
+    <form action="/activate" method="get">
+      <button class="btn-xl btn-secondary" type="submit">
+        Activate Account
+        <span class="icon">➜</span>
+      </button>
+    </form>
+  </div>
 
-    <div class="cta">
-      <form action="/login" method="get">
-        <button class="btn-xl btn-brand" type="submit">
-          Student Login
-          <span class="icon">➜</span>
-        </button>
-      </form>
-
-      <form action="/activate-account" method="get">
-        <button class="btn-xl" type="submit">
-          Activate Account
-          <span class="icon">➜</span>
-        </button>
-      </form>
-
-      <form action="/admin-login" method="get">
-        <button class="btn-xl btn-ghost" type="submit">
-          Admin Login
-          <span class="icon">⚙︎</span>
-        </button>
-      </form>
-    </div>
+  <div class="btn-wrapper">
+    <form action="/admin-login" method="get">
+      <button class="btn-xl btn-secondary" type="submit">
+        Admin Login
+        <span class="icon">➜</span>
+      </button>
+    </form>
   </div>
 </div>
 
