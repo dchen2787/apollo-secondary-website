@@ -145,7 +145,7 @@
         </div>
         <div class="muted"><%= (slot.notes && slot.notes.trim()) ? slot.notes : '—' %></div>
         <div style="margin-top:10px;">
-          <% if (!matchingLocked) { %>
+          <% if (!confirmed) { %>
             <form action="/unclaim" method="post" style="display:inline;">
               <input type="hidden" name="userEmail" value="<%= user.email %>">
               <input type="hidden" name="slotId" value="<%= slot._id %>">
