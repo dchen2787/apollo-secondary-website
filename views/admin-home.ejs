@@ -1,204 +1,365 @@
 <%- include("./partials/header"); -%>
 
-<div id="view-shadow-slots" class="container">
-  <h1>Admin Dashboard</h1>
+<style>
+  .admin-wrap {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    gap: 18px;
+  }
+  @media (max-width: 991px) {
+    .admin-wrap { grid-template-columns: 1fr; }
+  }
 
+  /* Sidebar */
+  .admin-nav {
+    position: sticky;
+    top: 16px;
+    align-self: start;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 12px;
+    box-shadow: 0 8px 22px rgba(0,0,0,.06);
+  }
+  .admin-nav h5 {
+    margin: 4px 8px 8px;
+    font-weight: 700;
+  }
+  .admin-nav .nav-link {
+    display: flex; justify-content: space-between; align-items: center;
+    border-radius: 8px; padding: 8px 10px; color: #111;
+  }
+  .admin-nav .nav-link:hover { background: #f7f7f7; text-decoration: none; }
+  .admin-nav .active { background: #eef2ff; }
+
+  /* Main content */
+  .admin-main { min-width: 0; }
+  .cardish {
+    background: #fff; border: 1px solid #e5e7eb; border-radius: 12px;
+    padding: 14px; box-shadow: 0 8px 22px rgba(0,0,0,.06);
+    margin-bottom: 18px;
+  }
+  .section-head {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 10px;
+  }
+  .section-head h2 { margin: 0; font-size: 22px; }
+  .btn-toggle {
+    margin-left: auto; border: 1px solid #e5e7eb; background: #f8f9fa;
+    border-radius: 8px; padding: 6px 10px; font-size: 13px;
+  }
+
+  /* Small helpers */
+  .muted { color: #6b7280; }
+  .divider { height: 1px; background: #e5e7eb; margin: 10px 0; }
+
+  /* Tables/list rows */
+  .row-head { font-weight: 700; }
+  .row { align-items: center; }
+</style>
+
+<div class="container">
   <% if (errM && errM.length) { %>
-    <div class="alert alert-info" style="margin: 8px 0;"><%= errM %></div>
+    <div class="alert alert-info" style="margin:10px 0;"><%= errM %></div>
   <% } %>
 
-  <hr />
+  <div class="admin-wrap">
+    <!-- Sticky Sidebar -->
+    <nav class="admin-nav" id="adminNav">
+      <h5>Admin Panel</h5>
+      <a class="nav-link" href="#sec-accounts">Create Accounts <span>➜</span></a>
+      <a class="nav-link" href="#sec-exports">Exports <span>➜</span></a>
+      <a class="nav-link" href="#sec-students">Student Hours <span>➜</span></a>
+      <a class="nav-link" href="#sec-schools">Hours by School <span>➜</span></a>
+      <a class="nav-link" href="#sec-match">Match Settings <span>➜</span></a>
+      <a class="nav-link" href="#sec-confirms">Confirm Controls <span>➜</span></a>
+      <a class="nav-link" href="#sec-slots">Shadow Slots <span>➜</span></a>
+    </nav>
 
-  <!-- ==================== CREATE ACCOUNTS ==================== -->
-  <h2>Create Accounts</h2>
-  <form action="/admin-newAccounts" method="post">
-    <h4>New Student Users</h4>
-    <p class="text-muted" style="margin-top:-6px;">
-      Format per student (use <strong>###</strong> between multiple students):<br/>
-      <code>email///password///group///isLyte///school</code><br/>
-      Examples:<br/>
-      <code>jane@x.com///pw123///2024///yes///Roosevelt HS###john@y.com///pw456///2025///no///Jefferson HS</code>
-    </p>
-    <input type="text" name="uploadUsers" class="form-control" placeholder="Paste students here">
-    <br/>
-    <h4>New Admins</h4>
-    <p class="text-muted" style="margin-top:-6px;">
-      Format per admin (use <strong>###</strong> between multiple admins):<br/>
-      <code>First///Last///email///password</code>
-    </p>
-    <input type="text" name="uploadAdmins" class="form-control" placeholder="Paste admins here">
-    <br/>
-    <button type="submit" class="btn">Create</button>
-  </form>
+    <!-- Main Content -->
+    <div class="admin-main">
 
-  <br/><hr/>
+      <!-- Create Accounts -->
+      <section id="sec-accounts" class="cardish">
+        <div class="section-head">
+          <h2>Create Accounts</h2>
+          <button class="btn-toggle" data-target="#accountsBody">Collapse</button>
+        </div>
+        <div id="accountsBody">
+          <form action="/admin-newAccounts" method="post">
+            <h5>New Student Users</h5>
+            <p class="muted" style="margin-top:-6px;">
+              Format per student (use <strong>###</strong> between multiple students):<br/>
+              <code>email///password///group///isLyte///school</code><br/>
+              Example:<br/>
+              <code>jane@x.com///pw123///2024///yes///Roosevelt HS###john@y.com///pw456///2025///no///Jefferson HS</code>
+            </p>
+            <input type="text" name="uploadUsers" class="form-control" placeholder="Paste students here">
+            <br/>
+            <h5>New Admins</h5>
+            <p class="muted" style="margin-top:-6px;">
+              Format per admin (use <strong>###</strong> between multiple admins):<br/>
+              <code>First///Last///email///password</code>
+            </p>
+            <input type="text" name="uploadAdmins" class="form-control" placeholder="Paste admins here">
+            <br/>
+            <button type="submit" class="btn">Create</button>
+          </form>
+        </div>
+      </section>
 
-  <!-- ==================== CSV EXPORTS ==================== -->
-  <h2>Exports</h2>
-  <div style="margin: 12px 0;">
-    <a class="btn" href="/admin/export/students.csv">Download Students CSV (All)</a>
-    <a class="btn" href="/admin/export/students.csv?lyte=1">Download Students CSV (LYTE only)</a>
-    <a class="btn" href="/admin/export/slots.csv">Download Slots CSV</a>
+      <!-- Exports -->
+      <section id="sec-exports" class="cardish">
+        <div class="section-head">
+          <h2>Exports</h2>
+          <button class="btn-toggle" data-target="#exportsBody">Collapse</button>
+        </div>
+        <div id="exportsBody">
+          <div style="margin: 12px 0;">
+            <a class="btn" href="/admin/export/students.csv">Download Students CSV (All)</a>
+            <a class="btn" href="/admin/export/students.csv?lyte=1">Download Students CSV (LYTE only)</a>
+            <a class="btn" href="/admin/export/slots.csv">Download Slots CSV</a>
+          </div>
+
+          <form action="/admin/export/students.csv" method="get" class="form-inline" style="margin: 8px 0;">
+            <label for="schoolCsv" style="margin-right:8px;">Students CSV filtered by school:</label>
+            <input id="schoolCsv" class="form-control" type="text" name="school" placeholder="Exact school name">
+            <button class="btn" type="submit" style="margin-left:8px;">Download</button>
+          </form>
+        </div>
+      </section>
+
+      <!-- Student Hours -->
+      <section id="sec-students" class="cardish">
+        <div class="section-head">
+          <h2>Student Hours</h2>
+          <button class="btn-toggle" data-target="#studentsBody">Collapse</button>
+        </div>
+        <div id="studentsBody">
+          <div class="d-flex" style="gap:10px; align-items:center; flex-wrap:wrap;">
+            <% if (lyteOnly) { %>
+              <a href="/admin" class="btn btn-light">Show all students</a>
+              <span class="badge badge-info">LYTE filter is ON</span>
+            <% } else { %>
+              <a href="/admin?lyte=true" class="btn btn-light">Show LYTE only</a>
+            <% } %>
+            <input id="studentSearch" class="form-control" placeholder="Search student or email" style="max-width:260px;">
+          </div>
+
+          <div class="row row-head" style="margin-top:10px;">
+            <div class="col-12 col-md-4">Student</div>
+            <div class="col-12 col-md-3">Email</div>
+            <div class="col-12 col-md-3">School</div>
+            <div class="col-12 col-md-2">Hours</div>
+          </div>
+          <div class="divider"></div>
+
+          <div id="studentList">
+            <% (studentHours || []).forEach(function(s){ %>
+              <div class="row student-row" data-search="<%= [s.name, s.email, s.school].join(' ').toLowerCase() %>">
+                <div class="col-12 col-md-4">
+                  <%= s.name || "(no name)" %> <%= s.isLyte ? "• LYTE" : "" %>
+                </div>
+                <div class="col-12 col-md-3"><%= s.email %></div>
+                <div class="col-12 col-md-3"><%= s.school || "(No school)" %></div>
+                <div class="col-12 col-md-2"><%= s.hours.toFixed(2) %></div>
+              </div>
+              <div class="divider"></div>
+            <% }) %>
+          </div>
+        </div>
+      </section>
+
+      <!-- Hours by School -->
+      <section id="sec-schools" class="cardish">
+        <div class="section-head">
+          <h2>Hours by School</h2>
+          <button class="btn-toggle" data-target="#schoolsBody">Collapse</button>
+        </div>
+        <div id="schoolsBody">
+          <div class="row row-head">
+            <div class="col-12 col-md-8">School</div>
+            <div class="col-12 col-md-4">Total Hours</div>
+          </div>
+          <div class="divider"></div>
+          <% (hoursBySchool || []).forEach(function(r){ %>
+            <div class="row">
+              <div class="col-12 col-md-8"><%= r.school %></div>
+              <div class="col-12 col-md-4"><%= r.hours.toFixed(2) %></div>
+            </div>
+            <div class="divider"></div>
+          <% }) %>
+        </div>
+      </section>
+
+      <!-- Match Settings -->
+      <section id="sec-match" class="cardish">
+        <div class="section-head">
+          <h2>Match Settings</h2>
+          <button class="btn-toggle" data-target="#matchBody">Collapse</button>
+        </div>
+        <div id="matchBody">
+          <form action="/admin-matchSettings" method="post">
+            <div class="form-group">
+              <label>Max Slots Per Student:</label>
+              <input type="number" name="maxSlots" value="<%= maxSlots %>" class="form-control" style="max-width:200px;">
+            </div>
+
+            <div class="form-group" style="margin-top:10px;">
+              <label>Matching Lock:</label><br/>
+              <label style="margin-right:10px;">
+                <input type="radio" name="matchingLock" value="true" <%= (controls && controls.matchingLocked) ? "checked" : "" %>> Locked (no new claims)
+              </label>
+              <label>
+                <input type="radio" name="matchingLock" value="false" <%= (controls && !controls.matchingLocked) ? "checked" : "" %>> Unlocked
+              </label>
+            </div>
+
+            <div style="margin-top:12px;">
+              <label>Matching allowed for (Year/session joined, grad year)</label><br/>
+              <% for (let i = 0; i < allGroups.length; i++) { %>
+                <% var boxStatus = allGroups[i][1] ? "checked" : ""; %>
+                <input type="checkbox" name="<%= allGroups[i][0] %>" <%= boxStatus %>>
+                <%= allGroups[i][0] %><br/>
+              <% } %>
+            </div>
+
+            <button type="submit" class="btn" style="margin-top:12px;">Update Access</button>
+          </form>
+        </div>
+      </section>
+
+      <!-- Confirm Controls -->
+      <section id="sec-confirms" class="cardish">
+        <div class="section-head">
+          <h2>Confirm Controls</h2>
+          <button class="btn-toggle" data-target="#confirmsBody">Collapse</button>
+        </div>
+        <div id="confirmsBody">
+          <form action="/admin-reset-confirms" method="post"
+                onsubmit="return confirm('Reset ALL confirmations for everyone? This cannot be undone.');"
+                style="margin-bottom:16px;">
+            <button type="submit" class="btn btn-danger">Reset All Confirmations (only at end of session)</button>
+          </form>
+
+          <h5>Confirm Status</h5>
+          <% (confirms || []).forEach(function(confirm){ %>
+            <div class="row" style="align-items:center;">
+              <div class="col col-5"><%= confirm.email %></div>
+              <div class="col col-3">
+                <%= confirm.confirmed ? "true" : (typeof confirm.confirmed === "undefined" ? "-" : "false") %>
+              </div>
+              <div class="col col-4">
+                <form action="/admin-clear-confirm" method="post" style="display:inline;">
+                  <input type="hidden" name="email" value="<%= confirm.email %>">
+                  <button type="submit" class="btn btn-light"
+                          onclick="return confirm('Clear confirmation for <%= confirm.email %>?');">
+                    Clear
+                  </button>
+                </form>
+              </div>
+            </div>
+            <div class="divider"></div>
+          <% }); %>
+        </div>
+      </section>
+
+      <!-- Shadow Slots -->
+      <section id="sec-slots" class="cardish">
+        <div class="section-head">
+          <h2>Shadow Slots</h2>
+          <button class="btn-toggle" data-target="#slotsBody">Collapse</button>
+        </div>
+        <div id="slotsBody">
+          <div class="row row-head">
+            <div class="col col-12 col-lg-2">Physician</div>
+            <div class="col col-12 col-lg-2">Date</div>
+            <div class="col col-12 col-lg-2">Time</div>
+            <div class="col col-12 col-lg-2">Location</div>
+            <div class="col col-12 col-lg-2">Notes</div>
+            <div class="col col-12 col-lg-2">Matched?</div>
+          </div>
+          <div class="divider"></div>
+
+          <% (slots || []).forEach(function(slot){ %>
+            <div class="row">
+              <div class="col col-12 col-lg-2">
+                <%= slot.physName || '-' %><%= (slot.physSpecialty ? ', ' + slot.physSpecialty : '') %>
+              </div>
+              <div class="col col-12 col-lg-2">
+                <%= slot.dDate || '-' %>
+              </div>
+              <div class="col col-12 col-lg-2">
+                <%= (slot.timeStart || '-') %> to <%= (slot.timeEnd || '-') %>
+              </div>
+              <div class="col col-12 col-lg-2">
+                <%= slot.location || '-' %>
+              </div>
+              <div class="col col-12 col-lg-2">
+                <%= (slot.notes && slot.notes.trim()) ? slot.notes : '-' %>
+              </div>
+              <div class="col col-12 col-lg-2">
+                <% if (slot.studentEmail && slot.studentEmail.length) { %>
+                  <%= (slot.studentName || '') %><%= slot.studentName ? ' , ' : '' %><%= slot.studentEmail %>
+                <% } else { %>
+                  -
+                <% } %>
+              </div>
+            </div>
+            <div class="divider"></div>
+          <% }); %>
+        </div>
+      </section>
+
+    </div>
   </div>
-
-  <!-- School-filtered students CSV -->
-  <form action="/admin/export/students.csv" method="get" class="form-inline" style="margin: 8px 0;">
-    <label for="schoolCsv" style="margin-right:8px;">Students CSV filtered by school:</label>
-    <input id="schoolCsv" class="form-control" type="text" name="school" placeholder="Exact school name">
-    <button class="btn" type="submit" style="margin-left:8px;">Download</button>
-  </form>
-
-  <br/><hr/>
-
-  <!-- ==================== STUDENT HOURS + FILTERS ==================== -->
-  <div class="d-flex" style="gap:10px; align-items:center; flex-wrap:wrap;">
-    <h2 style="margin: 0;">Student Hours</h2>
-    <% if (lyteOnly) { %>
-      <a href="/admin" class="btn btn-light">Show all students</a>
-      <span class="badge badge-info">LYTE filter is ON</span>
-    <% } else { %>
-      <a href="/admin?lyte=true" class="btn btn-light">Show LYTE only</a>
-    <% } %>
-  </div>
-
-  <div class="row font-weight-bold" style="margin-top:10px;">
-    <div class="col-12 col-md-4">Student</div>
-    <div class="col-12 col-md-3">Email</div>
-    <div class="col-12 col-md-3">School</div>
-    <div class="col-12 col-md-2">Hours</div>
-  </div>
-  <hr/>
-  <% (studentHours || []).forEach(function(s){ %>
-    <div class="row">
-      <div class="col-12 col-md-4">
-        <%= s.name || "(no name)" %> <%= s.isLyte ? "• LYTE" : "" %>
-      </div>
-      <div class="col-12 col-md-3"><%= s.email %></div>
-      <div class="col-12 col-md-3"><%= s.school || "(No school)" %></div>
-      <div class="col-12 col-md-2"><%= s.hours.toFixed(2) %></div>
-    </div>
-    <hr/>
-  <% }) %>
-
-  <h2>Hours by School</h2>
-  <div class="row font-weight-bold">
-    <div class="col-12 col-md-8">School</div>
-    <div class="col-12 col-md-4">Total Hours</div>
-  </div>
-  <hr/>
-  <% (hoursBySchool || []).forEach(function(r){ %>
-    <div class="row">
-      <div class="col-12 col-md-8"><%= r.school %></div>
-      <div class="col-12 col-md-4"><%= r.hours.toFixed(2) %></div>
-    </div>
-    <hr/>
-  <% }) %>
-
-  <br/><hr/>
-
-  <!-- ==================== MATCH SETTINGS ==================== -->
-  <h2>Match Settings</h2>
-  <form action="/admin-matchSettings" method="post">
-    <div class="form-group">
-      <label>Max Slots Per Student:</label>
-      <input type="number" name="maxSlots" value="<%= maxSlots %>" class="form-control" style="max-width:200px;">
-    </div>
-
-    <div class="form-group" style="margin-top:10px;">
-      <label>Matching Lock:</label><br/>
-      <label style="margin-right:10px;">
-        <input type="radio" name="matchingLock" value="true"> Locked (no new claims)
-      </label>
-      <label>
-        <input type="radio" name="matchingLock" value="false" checked> Unlocked
-      </label>
-    </div>
-
-    <div style="margin-top:12px;">
-      <label>Matching allowed for (Year/session joined, grad year)</label><br/>
-      <% for (let i = 0; i < allGroups.length; i++) { %>
-        <% var boxStatus = allGroups[i][1] ? "checked" : ""; %>
-        <input type="checkbox" name="<%= allGroups[i][0] %>" <%= boxStatus %>>
-        <%= allGroups[i][0] %><br/>
-      <% } %>
-    </div>
-
-    <button type="submit" class="btn" style="margin-top:12px;">Update Access</button>
-  </form>
-
-  <br/><hr/>
-
-  <!-- ==================== CONFIRM CONTROLS ==================== -->
-  <h2>Confirm Controls</h2>
-  <form action="/admin-reset-confirms" method="post"
-        onsubmit="return confirm('Reset ALL confirmations for everyone? This cannot be undone.');"
-        style="margin-bottom:16px;">
-    <button type="submit" class="btn btn-danger">Reset All Confirmations (only at end of session)</button>
-  </form>
-
-  <h3>Confirm Status</h3>
-  <!-- future todo: show only students who have 1+ slot -->
-  <% (confirms || []).forEach(function(confirm){ %>
-    <div class="row" style="align-items:center;">
-      <div class="col col-5"><%= confirm.email %></div>
-      <div class="col col-3">
-        <%= confirm.confirmed ? "true" : (typeof confirm.confirmed === "undefined" ? "-" : "false") %>
-      </div>
-      <div class="col col-4">
-        <form action="/admin-clear-confirm" method="post" style="display:inline;">
-          <input type="hidden" name="email" value="<%= confirm.email %>">
-          <button type="submit" class="btn btn-light"
-                  onclick="return confirm('Clear confirmation for <%= confirm.email %>?');">
-            Clear
-          </button>
-        </form>
-      </div>
-    </div>
-    <hr/>
-  <% }); %>
-
-  <br/>
-
-  <!-- ==================== SHADOW SLOTS ==================== -->
-  <h2 id="shadow-slots-head">Shadow Slots</h2>
-  <div class="row font-weight-bold">
-    <div class="col col-12 col-lg-2">Physician</div>
-    <div class="col col-12 col-lg-2">Date</div>
-    <div class="col col-12 col-lg-2">Time</div>
-    <div class="col col-12 col-lg-2">Location</div>
-    <div class="col col-12 col-lg-2">Notes</div>
-    <div class="col col-12 col-lg-2">Matched?</div>
-  </div>
-  <hr>
-
-  <% (slots || []).forEach(function(slot){ %>
-    <div class="row">
-      <div class="col col-12 col-lg-2">
-        <%= slot.physName || '-' %><%= (slot.physSpecialty ? ', ' + slot.physSpecialty : '') %>
-      </div>
-      <div class="col col-12 col-lg-2">
-        <%= slot.dDate || '-' %>
-      </div>
-      <div class="col col-12 col-lg-2">
-        <%= (slot.timeStart || '-') %> to <%= (slot.timeEnd || '-') %>
-      </div>
-      <div class="col col-12 col-lg-2">
-        <%= slot.location || '-' %>
-      </div>
-      <div class="col col-12 col-lg-2">
-        <%= (slot.notes && slot.notes.trim()) ? slot.notes : '-' %>
-      </div>
-      <div class="col col-12 col-lg-2">
-        <% if (slot.studentEmail && slot.studentEmail.length) { %>
-          <%= (slot.studentName || '') %><%= slot.studentName ? ' , ' : '' %><%= slot.studentEmail %>
-        <% } else { %>
-          -
-        <% } %>
-      </div>
-    </div>
-    <hr />
-  <% }); %>
-
 </div>
+
+<script>
+  // Collapse/Expand per section
+  document.querySelectorAll('.btn-toggle').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.getAttribute('data-target');
+      const el = document.querySelector(id);
+      if (!el) return;
+      const hidden = el.style.display === 'none';
+      el.style.display = hidden ? '' : 'none';
+      btn.textContent = hidden ? 'Collapse' : 'Expand';
+    });
+  });
+
+  // Sidebar active link highlight on scroll
+  const links = Array.from(document.querySelectorAll('#adminNav .nav-link'));
+  const sections = links.map(a => document.querySelector(a.getAttribute('href'))).filter(Boolean);
+
+  function setActive() {
+    const y = window.scrollY + 120; // offset for sticky
+    let activeIndex = 0;
+    sections.forEach((sec, i) => {
+      if (sec.offsetTop <= y) activeIndex = i;
+    });
+    links.forEach((l,i)=> l.classList.toggle('active', i === activeIndex));
+  }
+  window.addEventListener('scroll', setActive);
+  setActive();
+
+  // Student search filter
+  const studentSearch = document.getElementById('studentSearch');
+  if (studentSearch) {
+    const rows = Array.from(document.querySelectorAll('.student-row'));
+    const apply = () => {
+      const q = (studentSearch.value || '').toLowerCase().trim();
+      rows.forEach(r => {
+        const hay = r.getAttribute('data-search') || '';
+        r.style.display = hay.includes(q) ? '' : 'none';
+        // divider right after row
+        const div = r.nextElementSibling;
+        if (div && div.classList.contains('divider')) {
+          div.style.display = hay.includes(q) ? '' : 'none';
+        }
+      });
+    };
+    studentSearch.addEventListener('input', apply);
+  }
+</script>
 
 <%- include("./partials/footer"); -%>
