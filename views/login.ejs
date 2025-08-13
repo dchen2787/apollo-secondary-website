@@ -3,108 +3,141 @@
 <style>
   :root{
     --congress-blue: #04488e;
-    --danube: #74abdb;
-    --iron: #dbdbdc;
+    --danube: #74abdb;      /* light brand blue */
+    --iron: #dbdbdc;        /* light gray border */
     --cadet-blue: #a4b4c4;
     --bermuda-gray: #6c8cac;
-    --wild-sand: #f6f6f6;
-    --pigeon-post: #aac6db;
-    --danube2: #64a4d1;
+    --wild-sand: #f6f6f6;   /* page bg */
+    --pigeon-post: #aac6db; /* soft panel tint */
+    --danube2: #64a4d1;     /* alt light blue */
     --rock-blue: #a4b4cc;
-    --catskill-white: #ebf4f5;
+    --catskill-white: #ebf4f5; /* very light teal */
   }
 
-  body {
-    background: var(--wild-sand);
-    color: black;
-    font-family: sans-serif;
+  /* Page */
+  body { background: var(--wild-sand); color:#000; }
+  .wrap {
+    min-height: calc(100vh - 60px);
+    display: grid;
+    place-items: start center;
+    padding: 40px 16px 80px;
   }
+  h1 { text-align:center; font-weight:800; margin: 6px 0 24px; color:#000; }
 
-  #login-page {
-    max-width: 1000px;
-    margin: 0 auto;
-    padding: 40px 20px;
-  }
-
-  #login-page h1 {
-    text-align: center;
-    font-size: 36px;
-    font-weight: 800;
-    color: black;
-    margin-bottom: 30px;
-  }
-
-  .login-card {
-    background: white;
-    padding: 30px;
-    border-radius: 12px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.08);
-    max-width: 420px;
-    margin: auto;
-  }
-
-  .login-card h2 {
-    margin-top: 0;
-    font-size: 24px;
-    font-weight: 700;
-    color: black;
-  }
-
-  .login-card h3 {
-    color: red;
-    font-size: 16px;
-    margin-bottom: 16px;
-  }
-
-  input[type="email"],
-  input[type="password"] {
-    width: 100%;
-    padding: 12px;
-    margin: 8px 0 16px;
+  /* Pretty panel */
+  .panel {
+    width: 560px; max-width: 100%;
+    border-radius: 18px;
+    background: linear-gradient(155deg, var(--catskill-white), var(--pigeon-post));
     border: 1px solid var(--iron);
-    border-radius: 6px;
-    font-size: 15px;
-    color: black;
+    box-shadow:
+      0 18px 50px rgba(4,72,142,.10),
+      0 6px 20px rgba(0,0,0,.06);
+    padding: 26px;
   }
+  .panel h2 { margin: 0 0 16px; font-weight:800; color:#000; }
 
-  .btn {
+  /* Form bits */
+  .field { margin-bottom: 14px; }
+  .label { font-weight: 600; margin-bottom: 6px; display:block; color:#000; }
+  .input-wrap { position:relative; }
+  .input {
     width: 100%;
-    padding: 12px;
-    border: none;
-    border-radius: 8px;
-    font-weight: bold;
+    border: 1px solid var(--iron);
+    background: #fff;
+    border-radius: 10px;
+    padding: 12px 14px;
     font-size: 16px;
-    color: #fff;
+    color:#000;
+    box-shadow: inset 0 1px 0 rgba(0,0,0,.02);
+  }
+  .input:focus { outline: none; border-color: var(--danube2); box-shadow: 0 0 0 3px rgba(100,164,209,.25); }
+
+  /* Show/Hide password button */
+  .toggle {
+    position:absolute; right:8px; top:50%; transform:translateY(-50%);
+    border:0; background:transparent; cursor:pointer;
+    padding:6px 8px; border-radius:8px; color:#04488e;
+  }
+  .toggle:focus { outline:none; box-shadow: 0 0 0 3px rgba(100,164,209,.25); }
+
+  /* Submit */
+  .btn {
+    display:block; width:100%;
+    border-radius: 12px;
+    padding: 12px 16px;
+    border: 1px solid #033c76;
+    color:#fff; font-weight:800; letter-spacing:.2px;
     background: linear-gradient(90deg, var(--danube), var(--congress-blue));
-    cursor: pointer;
-    transition: transform 0.05s ease, box-shadow 0.2s ease;
+    box-shadow: 0 6px 18px rgba(4,72,142,.25);
+    transition: transform .05s ease, box-shadow .15s ease, filter .15s ease;
+  }
+  .btn:hover { transform: translateY(-1px); box-shadow: 0 10px 26px rgba(4,72,142,.28); filter: brightness(1.03); }
+  .btn:active { transform: translateY(0); }
+
+  /* Errors */
+  .alert {
+    margin: 0 0 12px; border-radius: 10px; padding: 10px 12px;
+    background: #fde2e2; color:#7a1f1f; border:1px solid #f5bcbc;
   }
 
-  .btn:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 6px 14px rgba(0,0,0,0.15);
+  /* Keep panel slightly left so the big headline feels centered on wide screens */
+  @media (min-width: 1100px){
+    .wrap { place-items: start center; }
+    .panel { margin-left: -160px; }
   }
 </style>
 
-<div id="login-page">
-  <h1>Student Login</h1>
-  <div id="login-container" class="container">
-    <div class="row">
-      <div class="col col-12 col-md-6">
-        <div class="login-card">
-          <h2>Log In</h2>
-          <% if (errM && errM.length) { %>
-            <h3><%= errM %></h3>
-          <% } %>
-          <form action="/login" method="post">
-            <input type="email" name="email" placeholder="Email" required>
-            <input type="password" name="password" placeholder="Password" required>
-            <button type="submit" class="btn">Submit</button>
-          </form>
+<div class="wrap">
+  <div>
+    <h1>Student Login</h1>
+
+    <% if (typeof errM !== 'undefined' && errM) { %>
+      <div class="alert"><%= errM %></div>
+    <% } %>
+    <% if (typeof errM2 !== 'undefined' && errM2) { %>
+      <div class="alert"><%= errM2 %></div>
+    <% } %>
+
+    <div class="panel">
+      <h2>Log In</h2>
+      <form action="/login" method="post" novalidate>
+        <div class="field">
+          <label class="label" for="email">Email</label>
+          <input class="input" id="email" type="email" name="email" placeholder="you@example.com" required>
         </div>
-      </div>
+
+        <div class="field">
+          <label class="label" for="password">Password</label>
+          <div class="input-wrap">
+            <input class="input" id="password" type="password" name="password" placeholder="••••••••" required>
+            <button type="button" class="toggle" id="pwToggle" aria-label="Show password">👁</button>
+          </div>
+        </div>
+
+        <div class="field" style="margin-top:18px;">
+          <button class="btn" type="submit">Submit</button>
+        </div>
+      </form>
     </div>
   </div>
 </div>
+
+<script>
+  // Show / Hide password
+  (function(){
+    const input  = document.getElementById('password');
+    const toggle = document.getElementById('pwToggle');
+    if (!input || !toggle) return;
+
+    function update() {
+      const isPw = input.type === 'password';
+      input.type = isPw ? 'text' : 'password';
+      toggle.textContent = isPw ? '🙈' : '👁';
+      toggle.setAttribute('aria-label', isPw ? 'Hide password' : 'Show password');
+    }
+    toggle.addEventListener('click', update);
+  })();
+</script>
 
 <%- include("./partials/footer"); -%>
