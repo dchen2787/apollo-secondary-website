@@ -1,15 +1,84 @@
 <%- include("./partials/header"); -%>
 
-<div id="landing-page">
-<h1>Welcome to Apollo's Match Portal!</h1>
-<br />
-<a href="https://the-match-apolloyim-2f158c0ae122.herokuapp.com/login"><button type="button" name="button" class="btn">Student Login &nbsp;<i class="fa fa-arrow-circle-right"></i></button></a>
-<br /><br />
+<style>
+  :root{
+    --bg1:#f8fafc; --bg2:#eef2ff; --ink:#0f172a; --muted:#6b7280;
+    --brand:#1d4ed8; --card:#ffffff; --ring:#e5e7eb;
+  }
+  body { background: radial-gradient(1200px 600px at 20% -10%, var(--bg2), transparent) , var(--bg1); }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 28px 16px 64px; }
+  .topbar {
+    display:flex; align-items:center; gap:14px; padding:14px 0 18px; margin-bottom:14px;
+    border-bottom:1px solid var(--ring);
+  }
+  .brand-badge{
+    width:58px;height:58px;border-radius:50%;
+    background:#e0e7ff; display:flex; align-items:center; justify-content:center;
+    font-weight:800; color:#1e40af; letter-spacing:.5px;
+  }
+  .title { font-size:38px; font-weight:800; color:var(--ink); }
+  .hero {
+    margin: 22px 0 12px;
+  }
+  .hero h1 { font-size:44px; line-height:1.1; margin:0 0 18px; font-weight:800; color:var(--ink); }
+  .cta {
+    display:flex; flex-direction:column; gap:16px; max-width: 360px;
+  }
+  .btn-xl {
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    border:none; border-radius:14px; padding:14px 16px; width:100%;
+    background:var(--card); box-shadow:0 10px 30px rgba(2,6,23,.08);
+    font-weight:700; color:#111827; border:1px solid var(--ring);
+    transition: transform .04s ease, box-shadow .2s ease, border-color .2s ease;
+  }
+  .btn-xl:hover { transform: translateY(-1px); box-shadow:0 14px 36px rgba(2,6,23,.12); border-color:#cbd5e1; }
+  .btn-brand { background:linear-gradient(180deg, #3b82f6, #1d4ed8); color:#fff; border:0; }
+  .btn-ghost { background:#f8fafc; }
+  .btn-xl .icon {
+    width:28px;height:28px;border-radius:999px;background:rgba(255,255,255,.25);
+    display:flex;align-items:center;justify-content:center; font-size:18px;
+  }
+  .subtle { color:var(--muted); margin-top:8px; }
+  @media (min-width: 900px){
+    .grid { display:grid; grid-template-columns: 1.2fr .8fr; gap:36px; align-items:center; }
+  }
+</style>
 
-<a href="https://the-match-apolloyim-2f158c0ae122.herokuapp.com/activate-account"><button type="button" name="button" class="btn">Activate Account &nbsp;<i class="fa fa-arrow-circle-right"></i></button></a>
-<br /><br />
+<div class="wrap">
+  <div class="topbar">
+    <div class="brand-badge">A</div>
+    <div class="title">The Match</div>
+  </div>
 
-<a href="https://the-match-apolloyim-2f158c0ae122.herokuapp.com/admin-login"><button type="button" name="button" class="btn">Admin Login</button></a>
+  <div class="grid">
+    <div class="hero">
+      <h1>Welcome to Apollo’s Match Portal!</h1>
+      <p class="subtle">Log in or activate your account to view and manage shadowing slots.</p>
+    </div>
+
+    <div class="cta">
+      <form action="/login" method="get">
+        <button class="btn-xl btn-brand" type="submit">
+          Student Login
+          <span class="icon">➜</span>
+        </button>
+      </form>
+
+      <form action="/activate-account" method="get">
+        <button class="btn-xl" type="submit">
+          Activate Account
+          <span class="icon">➜</span>
+        </button>
+      </form>
+
+      <form action="/admin-login" method="get">
+        <button class="btn-xl btn-ghost" type="submit">
+          Admin Login
+          <span class="icon">⚙︎</span>
+        </button>
+      </form>
+    </div>
+  </div>
 </div>
 
 <%- include("./partials/footer"); -%>
