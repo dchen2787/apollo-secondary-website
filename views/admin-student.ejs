@@ -1,0 +1,85 @@
+<%- include("./partials/header"); -%>
+<style>
+  .wrap { max-width: 960px; margin: 0 auto; padding: 24px 12px 48px; }
+  .cardish { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:16px; box-shadow:0 8px 22px rgba(0,0,0,.06); margin-bottom:18px; }
+  .title { font-size:22px; font-weight:800; margin:0 0 6px; }
+  .muted { color:#6b7280; }
+  .badge { display:inline-block; border-radius:999px; padding:2px 8px; background:#eef2ff; color:#1d4ed8; font-size:12px; margin-left:6px; }
+  .row-head { font-weight:700; }
+  .divider { height:1px; background:#e5e7eb; margin:10px 0; }
+  .btn { border:1px solid #e5e7eb; background:#f8f9fa; border-radius:8px; padding:6px 10px; }
+  .btn-danger { background:#fee2e2; color:#991b1b; border-color:#fecaca; }
+  .btn-primary { background:#111827; color:#fff; border-color:#111827; }
+  .pill { font-size:12px; border-radius:999px; padding:2px 8px; }
+  .pill-upcoming { background:#ecfeff; color:#155e75; }
+  .pill-past { background:#f1f5f9; color:#334155; }
+  .pill-adminonly { background:#fef3c7; color:#92400e; }
+</style>
+
+<div class="wrap">
+  <a href="/admin" class="btn">&larr; Back to Admin</a>
+
+  <div class="cardish">
+    <div class="title">
+      <%= (student.fName || "") + (student.lName ? (" " + student.lName) : "") || "(no name)" %>
+      <% if (student.archived) { %><span class="badge">Archived</span><% } %>
+    </div>
+    <div class="muted"><%= student.email %> • <%= student.school || "(No school)" %> • Group: <%= student.group || "-" %></div>
+    <div style="margin-top:10px;">
+      <form action="/admin/student/archive" method="post" style="display:inline;">
+        <input type="hidden" name="email" value="<%= student.email %>">
+        <input type="hidden" name="action" value="<%= student.archived ? 'unarchive' : 'archive' %>">
+        <button class="btn" type="submit"><%= student.archived ? "Unarchive Student" : "Archive Student" %></button>
+      </form>
+      <a class="btn" href="/admin/export/students.csv?school=<%= encodeURIComponent(student.school || '') %>" style="margin-left:8px;">Export school CSV</a>
+    </div>
+  </div>
+
+  <div class="cardish">
+    <div class="title">Manually Add a Slot to this Student</div>
+    <p class="muted" style="margin-top:-6px;">Enter an existing <strong>Slot ID</strong> to assign to this student. This assignment is <strong>admin‑only</strong> and will not appear in the student portal.</p>
+    <form action="/admin/student/add-slot" method="post" class="form-inline" style="margin-top:8px;">
+      <input type="hidden" name="email" value="<%= student.email %>">
+      <input class="form-control" type="text" name="slotId" placeholder="Enter Slot ID" style="max-width:320px;">
+      <button type="submit" class="btn btn-primary" style="margin-left:8px;">Assign</button>
+    </form>
+  </div>
+
+  <div class="cardish">
+    <div class="title">All Matches (Past + Upcoming)</div>
+
+    <div class="row row-head" style="margin-top:10px;">
+      <div class="col-12 col-lg-3">Physician</div>
+      <div class="col-12 col-lg-2">Specialty</div>
+      <div class="col-12 col-lg-2">Date</div>
+      <div class="col-12 col-lg-2">Time</div>
+      <div class="col-12 col-lg-2">Location</div>
+      <div class="col-12 col-lg-1">Actions</div>
+    </div>
+    <div class="divider"></div>
+
+    <% (slots || []).forEach(function(s){ %>
+      <div class="row" style="align-items:center;">
+        <div class="col-12 col-lg-3">
+          <%= s.physName || '-' %>
+          <% if (s.adminOnly) { %> <span class="pill pill-adminonly">Admin‑only</span> <% } %>
+          <span class="pill <%= s.isPast ? 'pill-past' : 'pill-upcoming' %>"><%= s.isPast ? 'Past' : 'Upcoming' %></span>
+        </div>
+        <div class="col-12 col-lg-2"><%= s.physSpecialty || '-' %></div>
+        <div class="col-12 col-lg-2"><%= s.dDate || '-' %></div>
+        <div class="col-12 col-lg-2"><%= (s.timeStart || '-') %> – <%= (s.timeEnd || '-') %></div>
+        <div class="col-12 col-lg-2"><%= s.location || '-' %></div>
+        <div class="col-12 col-lg-1">
+          <form action="/admin/student/remove-slot" method="post" onsubmit="return confirm('Remove this match?');">
+            <input type="hidden" name="slotId" value="<%= s._id %>">
+            <input type="hidden" name="email" value="<%= student.email %>">
+            <button type="submit" class="btn btn-danger">Remove</button>
+          </form>
+        </div>
+      </div>
+      <div class="divider"></div>
+    <% }) %>
+  </div>
+</div>
+
+<%- include("./partials/footer"); -%>
