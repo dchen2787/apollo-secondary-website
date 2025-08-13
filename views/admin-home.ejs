@@ -136,7 +136,7 @@
         </div>
       </section>
 
-      <!-- Student Hours -->
+<!-- Student Hours -->
       <section id="sec-students" class="cardish">
         <div class="section-head">
           <h2>Student Hours</h2>
@@ -165,7 +165,10 @@
             <% (studentHours || []).forEach(function(s){ %>
               <div class="row student-row" data-search="<%= [s.name, s.email, s.school].join(' ').toLowerCase() %>">
                 <div class="col-12 col-md-4">
-                  <%= s.name || "(no name)" %> <%= s.isLyte ? "• LYTE" : "" %>
+                  <a href="/admin/student/<%= encodeURIComponent(s.email) %>">
+                    <%= s.name || "(no name)" %>
+                  </a>
+                  <%= s.isLyte ? " • LYTE" : "" %>
                 </div>
                 <div class="col-12 col-md-3"><%= s.email %></div>
                 <div class="col-12 col-md-3"><%= s.school || "(No school)" %></div>
@@ -175,6 +178,40 @@
             <% }) %>
           </div>
         </div>
+      </section>
+
+      <!-- Archive -->
+
+      <section id="sec-archive" class="cardish">
+        <div class="section-head">
+          <h2>Archived Students (<%= archivedCount %>)</h2>
+        </div>
+        <div class="row row-head">
+          <div class="col-12 col-md-4">Student</div>
+          <div class="col-12 col-md-3">Email</div>
+          <div class="col-12 col-md-3">School</div>
+          <div class="col-12 col-md-2">Actions</div>
+        </div>
+        <div class="divider"></div>
+        <% (archivedStudents || []).forEach(function(st){ %>
+          <div class="row">
+            <div class="col-12 col-md-4">
+              <a href="/admin/student/<%= encodeURIComponent(st.email) %>">
+                <%= (st.fName || "") + (st.lName ? (" " + st.lName) : "") || "(no name)" %>
+              </a>
+            </div>
+            <div class="col-12 col-md-3"><%= st.email %></div>
+            <div class="col-12 col-md-3"><%= st.school || "(No school)" %></div>
+            <div class="col-12 col-md-2">
+              <form action="/admin/student/archive" method="post" style="display:inline;">
+                <input type="hidden" name="email" value="<%= st.email %>">
+                <input type="hidden" name="action" value="unarchive">
+                <button type="submit" class="btn btn-light">Unarchive</button>
+              </form>
+            </div>
+          </div>
+          <div class="divider"></div>
+        <% }) %>
       </section>
 
       <!-- Hours by School -->
@@ -246,7 +283,7 @@
           </form>
         </div>
       </section>
-
+      
       <!-- Confirm Controls -->
       <section id="sec-confirms" class="cardish">
         <div class="section-head">
