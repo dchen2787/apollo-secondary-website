@@ -232,40 +232,53 @@ function effectiveMaxSlots(ctrl) {
 }
 
 
-// Single place to render "home" with correct phase & counts
-async function renderHome(res, userEmail, errM = "") {
+// Students dashboard (list, hours, schools, archived)
+async function renderAdminStudents(res, flashMsg = "", lyteOnly = false, includeArchived = false) {
   try {
-    const [foundUser, slotsRaw, ctrl, confirmDoc, myCount] = await Promise.all([
-      userEmail ? Student.findOne({ email: userEmail }).lean() : null,
+    const [allSlots, ctrl, allStudents] = await Promise.all([
       Slot.find({}).lean(),
       Control.findOne({ id: 1 }).lean(),
-      userEmail ? Confirm.findOne({ email: userEmail }).lean() : null,
-      userEmail ? Slot.countDocuments({ studentEmail: (userEmail || "").toLowerCase() }) : Promise.resolve(0)
+      Student.find({}).lean()
     ]);
 
-    // hide admin-only slots from the student's view (when assigned to that student)
-    const visibleSlotsRaw = (slotsRaw || []).filter(
-      s => !(s.adminOnly && (s.studentEmail || "").toLowerCase() === (userEmail || "").toLowerCase())
-    );
+    const { studentHours, hoursBySchool } = buildAdminAnalytics(allSlots, allStudents, lyteOnly, includeArchived);
 
-    const slots = setDisplayValues(visibleSlotsRaw);
-    const confirmed = !!(confirmDoc && confirmDoc.confirmed);
-    const phaseVal  = ctrl?.phase ?? 3;
+    const activeCount   = (allStudents || []).filter(s => !s.archived).length;
+    const archivedCount = (allStudents || []).filter(s =>  s.archived).length;
 
-    res.render("home", {
-      user: foundUser,
-      slots,
-      controls: ctrl,
-      phase: phaseVal,
-      phaseName: phaseName(phaseVal),
-      maxSlots: effectiveMaxSlots(ctrl), // 0 means unlimited
-      currentCount: myCount,
-      errM,
-      confirmed,
-      isConfirmed: confirmed
+    res.render("admin-students", {
+      errM: flashMsg || "",
+      lyteOnly,
+      includeArchived,
+      studentHours,
+      hoursBySchool,
+      activeCount,
+      archivedCount,
+      archivedStudents: allStudents.filter(s => s.archived)
     });
   } catch (e) {
-    console.error(e);
+    return errorPage(res, e);
+  }
+}
+
+// Match dashboard (settings + confirms + shadow slots)
+async function renderAdminMatch(res, flashMsg = "") {
+  try {
+    const [slots, confirms, ctrl] = await Promise.all([
+      Slot.find({}).lean(),
+      Confirm.find({}).lean(),
+      Control.findOne({ id: 1 }).lean()
+    ]);
+    const array = setDisplayValues(slots);
+    res.render("admin-match", {
+      errM: flashMsg || "",
+      slots: array,
+      controls: ctrl,
+      maxSlots: (ctrl && ctrl.maxSlots) || 100,
+      allGroups: allGroups.sort(),
+      confirms
+    });
+  } catch (e) {
     return errorPage(res, e);
   }
 }
@@ -455,11 +468,23 @@ app.get("/admin/export/slots.csv", async function(req, res) {
 app.get("/", function(req,res){
   res.render("landing");
 });
-app.get("/admin", function(req,res){
-  const lyteOnly = String(req.query.lyte || "").toLowerCase() === "true";
-  const includeArchived = ["true","1","yes","y"].includes(String(req.query.archived || "").toLowerCase());
-  return renderAdminHome(res, "", lyteOnly, includeArchived);
+
+// NEW: split admin into two pages
+app.get("/admin", function(req, res) {
+  // Optional: make /admin land on students by default
+  return res.redirect("/admin/students");
 });
+
+app.get("/admin/students", function(req, res) {
+  const lyteOnly = ["true","1","yes","y"].includes(String(req.query.lyte || "").toLowerCase());
+  const includeArchived = ["true","1","yes","y"].includes(String(req.query.archived || "").toLowerCase());
+  return renderAdminStudents(res, "", lyteOnly, includeArchived);
+});
+
+app.get("/admin/match", function(req, res) {
+  return renderAdminMatch(res, "");
+});
+
 app.get("/admin-login", function(req,res){
   res.render("admin-login", {errM:""});
 });
@@ -470,11 +495,11 @@ app.get("/activate-account", function(req,res){
   res.render("activate-account", {errM:"", errM2:""});
 });
 
-// Rich admin search page (unchanged from your current — left out here for brevity)
-// If you still want it, keep your existing /admin/search handler above this catch-all:
+// IMPORTANT: keep this wildcard AT THE VERY END of all routes
 app.get('*', function(req, res) {
   res.redirect('/');
 });
+
 
 // POSTs
 // Admin login (simple: redirect to /admin on success; no session)
