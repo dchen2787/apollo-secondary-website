@@ -145,11 +145,21 @@
         <div id="studentsBody">
           <div class="d-flex" style="gap:10px; align-items:center; flex-wrap:wrap;">
             <% if (lyteOnly) { %>
-              <a href="/admin" class="btn btn-light">Show all students</a>
+              <a href="/admin?<%= includeArchived ? 'archived=true&' : '' %>" class="btn btn-light">Show all students</a>
               <span class="badge badge-info">LYTE filter is ON</span>
             <% } else { %>
-              <a href="/admin?lyte=true" class="btn btn-light">Show LYTE only</a>
+              <a href="/admin?<%= includeArchived ? 'archived=true&' : '' %>lyte=true" class="btn btn-light">Show LYTE only</a>
             <% } %>
+          
+            <% if (includeArchived) { %>
+              <a href="/admin<%= lyteOnly ? '?lyte=true' : '' %>" class="btn btn-light">Hide archived</a>
+              <span class="badge badge-info">Archived included</span>
+            <% } else { %>
+              <a href="/admin?<%= lyteOnly ? 'lyte=true&' : '' %>archived=true" class="btn btn-light">Include archived</a>
+            <% } %>
+          
+            <span class="muted">Active: <%= activeCount %> • Archived: <%= archivedCount %></span>
+          
             <input id="studentSearch" class="form-control" placeholder="Search student or email" style="max-width:260px;">
           </div>
 
