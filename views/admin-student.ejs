@@ -1,85 +1,151 @@
 <%- include("./partials/header"); -%>
 <style>
-  .wrap { max-width: 960px; margin: 0 auto; padding: 24px 12px 48px; }
-  .cardish { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:16px; box-shadow:0 8px 22px rgba(0,0,0,.06); margin-bottom:18px; }
-  .title { font-size:22px; font-weight:800; margin:0 0 6px; }
-  .muted { color:#6b7280; }
-  .badge { display:inline-block; border-radius:999px; padding:2px 8px; background:#eef2ff; color:#1d4ed8; font-size:12px; margin-left:6px; }
-  .row-head { font-weight:700; }
-  .divider { height:1px; background:#e5e7eb; margin:10px 0; }
-  .btn { border:1px solid #e5e7eb; background:#f8f9fa; border-radius:8px; padding:6px 10px; }
-  .btn-danger { background:#fee2e2; color:#991b1b; border-color:#fecaca; }
-  .btn-primary { background:#111827; color:#fff; border-color:#111827; }
-  .pill { font-size:12px; border-radius:999px; padding:2px 8px; }
-  .pill-upcoming { background:#ecfeff; color:#155e75; }
-  .pill-past { background:#f1f5f9; color:#334155; }
-  .pill-adminonly { background:#fef3c7; color:#92400e; }
+  .admin-wrap{display:grid;grid-template-columns:220px 1fr;gap:18px}
+  @media(max-width:991px){.admin-wrap{grid-template-columns:1fr}}
+  .cardish{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px;box-shadow:0 8px 22px rgba(0,0,0,.06);margin-bottom:18px}
+  .muted{color:#6b7280}
+  .divider{height:1px;background:#e5e7eb;margin:10px 0}
+  .nav a{display:block;padding:8px 10px;border-radius:8px;color:#111}
+  .nav a:hover{background:#f7f7f7;text-decoration:none}
+  .nav .active{background:#eef2ff}
 </style>
 
-<div class="wrap">
-  <a href="/admin" class="btn">&larr; Back to Admin</a>
+<div class="container">
+  <% if (errM && errM.length) { %>
+    <div class="alert alert-info" style="margin:10px 0;"><%= errM %></div>
+  <% } %>
 
-  <div class="cardish">
-    <div class="title">
-      <%= (student.fName || "") + (student.lName ? (" " + student.lName) : "") || "(no name)" %>
-      <% if (student.archived) { %><span class="badge">Archived</span><% } %>
-    </div>
-    <div class="muted"><%= student.email %> • <%= student.school || "(No school)" %> • Group: <%= student.group || "-" %></div>
-    <div style="margin-top:10px;">
-      <form action="/admin/student/archive" method="post" style="display:inline;">
-        <input type="hidden" name="email" value="<%= student.email %>">
-        <input type="hidden" name="action" value="<%= student.archived ? 'unarchive' : 'archive' %>">
-        <button class="btn" type="submit"><%= student.archived ? "Unarchive Student" : "Archive Student" %></button>
-      </form>
-      <a class="btn" href="/admin/export/students.csv?school=<%= encodeURIComponent(student.school || '') %>" style="margin-left:8px;">Export school CSV</a>
-    </div>
-  </div>
-
-  <div class="cardish">
-    <div class="title">Manually Add a Slot to this Student</div>
-    <p class="muted" style="margin-top:-6px;">Enter an existing <strong>Slot ID</strong> to assign to this student. This assignment is <strong>admin‑only</strong> and will not appear in the student portal.</p>
-    <form action="/admin/student/add-slot" method="post" class="form-inline" style="margin-top:8px;">
-      <input type="hidden" name="email" value="<%= student.email %>">
-      <input class="form-control" type="text" name="slotId" placeholder="Enter Slot ID" style="max-width:320px;">
-      <button type="submit" class="btn btn-primary" style="margin-left:8px;">Assign</button>
-    </form>
-  </div>
-
-  <div class="cardish">
-    <div class="title">All Matches (Past + Upcoming)</div>
-
-    <div class="row row-head" style="margin-top:10px;">
-      <div class="col-12 col-lg-3">Physician</div>
-      <div class="col-12 col-lg-2">Specialty</div>
-      <div class="col-12 col-lg-2">Date</div>
-      <div class="col-12 col-lg-2">Time</div>
-      <div class="col-12 col-lg-2">Location</div>
-      <div class="col-12 col-lg-1">Actions</div>
-    </div>
-    <div class="divider"></div>
-
-    <% (slots || []).forEach(function(s){ %>
-      <div class="row" style="align-items:center;">
-        <div class="col-12 col-lg-3">
-          <%= s.physName || '-' %>
-          <% if (s.adminOnly) { %> <span class="pill pill-adminonly">Admin‑only</span> <% } %>
-          <span class="pill <%= s.isPast ? 'pill-past' : 'pill-upcoming' %>"><%= s.isPast ? 'Past' : 'Upcoming' %></span>
-        </div>
-        <div class="col-12 col-lg-2"><%= s.physSpecialty || '-' %></div>
-        <div class="col-12 col-lg-2"><%= s.dDate || '-' %></div>
-        <div class="col-12 col-lg-2"><%= (s.timeStart || '-') %> – <%= (s.timeEnd || '-') %></div>
-        <div class="col-12 col-lg-2"><%= s.location || '-' %></div>
-        <div class="col-12 col-lg-1">
-          <form action="/admin/student/remove-slot" method="post" onsubmit="return confirm('Remove this match?');">
-            <input type="hidden" name="slotId" value="<%= s._id %>">
-            <input type="hidden" name="email" value="<%= student.email %>">
-            <button type="submit" class="btn btn-danger">Remove</button>
-          </form>
-        </div>
+  <div class="admin-wrap">
+    <aside class="cardish" style="position:sticky;top:16px;align-self:start;">
+      <h5 style="margin:0 0 8px 0;">Admin</h5>
+      <div class="nav">
+        <a href="/admin/students" class="active">Students</a>
+        <a href="/admin/match">Match Controls</a>
       </div>
       <div class="divider"></div>
-    <% }) %>
+      <div class="muted">Active: <%= activeCount %> • Archived: <%= archivedCount %></div>
+    </aside>
+
+    <main>
+      <!-- Filters -->
+      <section class="cardish">
+        <form method="get" action="/admin/students" class="form-inline" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <input type="hidden" name="archived" value="<%= includeArchived ? 'true' : 'false' %>">
+          <label class="checkbox" style="display:flex;align-items:center;gap:6px;margin:0;">
+            <input type="checkbox" name="lyte" value="true" <%= lyteOnly ? 'checked' : '' %> />
+            <span>LYTE only</span>
+          </label>
+          <button class="btn btn-light" type="submit">Apply</button>
+          <% if (lyteOnly) { %>
+            <a class="btn btn-light" href="/admin/students?archived=<%= includeArchived ? 'true' : 'false' %>">Clear</a>
+          <% } %>
+          <span class="muted" style="margin-left:auto;">
+            View:
+            <% if (includeArchived) { %>
+              <a href="/admin/students?archived=false<%= lyteOnly ? '&lyte=true' : '' %>">Active</a> • <strong>Archived</strong>
+            <% } else { %>
+              <strong>Active</strong> • <a href="/admin/students?archived=true<%= lyteOnly ? '&lyte=true' : '' %>">Archived</a>
+            <% } %>
+          </span>
+        </form>
+      </section>
+
+      <!-- Student Hours -->
+      <section class="cardish">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <h2 style="margin:0;font-size:20px;">Student Hours</h2>
+          <% if (lyteOnly) { %><span class="badge badge-info">LYTE filter ON</span><% } %>
+          <input id="studentSearch" class="form-control" placeholder="Search name or email" style="max-width:260px;margin-left:auto;">
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="row row-head" style="font-weight:700;">
+          <div class="col-12 col-md-4">Student</div>
+          <div class="col-12 col-md-3">Email</div>
+          <div class="col-12 col-md-3">School</div>
+          <div class="col-12 col-md-2">Hours</div>
+        </div>
+        <div class="divider"></div>
+
+        <div id="studentList">
+          <% (studentHours || []).forEach(function(s){ %>
+            <div class="row student-row" data-search="<%= [s.name, s.email, s.school].join(' ').toLowerCase() %>">
+              <div class="col-12 col-md-4">
+                <a href="/admin/student/<%= encodeURIComponent(s.email) %>"><%= s.name || "(no name)" %></a>
+                <%= s.isLyte ? " • LYTE" : "" %>
+                <%= s.archived ? " • Archived" : "" %>
+              </div>
+              <div class="col-12 col-md-3"><a href="/admin/student/<%= encodeURIComponent(s.email) %>"><%= s.email %></a></div>
+              <div class="col-12 col-md-3"><%= s.school || "(No school)" %></div>
+              <div class="col-12 col-md-2"><%= s.hours.toFixed(2) %></div>
+            </div>
+            <div class="divider"></div>
+          <% }) %>
+        </div>
+      </section>
+
+      <!-- Hours by School -->
+      <section class="cardish">
+        <h2 style="margin:0 0 10px 0;font-size:20px;">Hours by School</h2>
+        <div class="row row-head" style="font-weight:700;">
+          <div class="col-12 col-md-8">School</div>
+          <div class="col-12 col-md-4">Total Hours</div>
+        </div>
+        <div class="divider"></div>
+        <% (hoursBySchool || []).forEach(function(r){ %>
+          <div class="row">
+            <div class="col-12 col-md-8"><%= r.school %></div>
+            <div class="col-12 col-md-4"><%= r.hours.toFixed(2) %></div>
+          </div>
+          <div class="divider"></div>
+        <% }) %>
+      </section>
+
+      <!-- Archived list tab -->
+      <section class="cardish">
+        <h2 style="margin:0 0 10px 0;font-size:20px;">Archived Students</h2>
+        <p class="muted" style="margin-top:-6px;">These users cannot log in, but their history remains.</p>
+        <div class="row row-head" style="font-weight:700;">
+          <div class="col-12 col-md-4">Student</div>
+          <div class="col-12 col-md-4">Email</div>
+          <div class="col-12 col-md-4">Actions</div>
+        </div>
+        <div class="divider"></div>
+        <% (archivedStudents || []).forEach(function(st){ %>
+          <div class="row">
+            <div class="col-12 col-md-4"><%= [st.fName, st.lName].filter(Boolean).join(' ') || '(no name)' %></div>
+            <div class="col-12 col-md-4"><a href="/admin/student/<%= encodeURIComponent(st.email) %>"><%= st.email %></a></div>
+            <div class="col-12 col-md-4">
+              <form action="/admin/student/archive" method="post" style="display:inline;">
+                <input type="hidden" name="email" value="<%= st.email %>">
+                <input type="hidden" name="action" value="unarchive">
+                <button class="btn btn-success btn-sm" onclick="return confirm('Unarchive <%= st.email %>?')">Unarchive</button>
+              </form>
+            </div>
+          </div>
+          <div class="divider"></div>
+        <% }) %>
+      </section>
+    </main>
   </div>
 </div>
 
+<script>
+  const studentSearch = document.getElementById('studentSearch');
+  if (studentSearch) {
+    const rows = Array.from(document.querySelectorAll('.student-row'));
+    const apply = () => {
+      const q = (studentSearch.value || '').toLowerCase().trim();
+      rows.forEach(r => {
+        const hay = r.getAttribute('data-search') || '';
+        const show = hay.includes(q);
+        r.style.display = show ? '' : 'none';
+        const div = r.nextElementSibling;
+        if (div && div.classList.contains('divider')) div.style.display = show ? '' : 'none';
+      });
+    };
+    studentSearch.addEventListener('input', apply);
+  }
+</script>
 <%- include("./partials/footer"); -%>
