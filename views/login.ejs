@@ -1,90 +1,76 @@
-<%- include("./partials/header"); -%>
-
 <style>
-  :root{ --ring:#e5e7eb; --ok:#0ea5e9; --ink:#0f172a; --muted:#64748b; }
-  body { background: linear-gradient(180deg, #eef2ff, #f8fafc); }
-  .wrap { max-width: 960px; margin: 0 auto; padding: 32px 16px 64px; }
-  .back { margin-bottom:16px; }
-  .card {
-    background:#fff; border:1px solid var(--ring); border-radius:18px; overflow:hidden;
-    box-shadow:0 10px 30px rgba(2,6,23,.08);
-    display:grid; grid-template-columns: 1fr; 
+  :root{
+    --congress-blue: #04488e;
+    --danube: #74abdb;
+    --iron: #dbdbdc;
+    --cadet-blue: #a4b4c4;
+    --bermuda-gray: #6c8cac;
+    --wild-sand: #f6f6f6;
+    --pigeon-post: #aac6db;
+    --danube2: #64a4d1;
+    --rock-blue: #a4b4cc;
+    --catskill-white: #ebf4f5;
   }
-  @media (min-width: 900px){ .card{ grid-template-columns: 1.1fr .9fr; } }
-  .side {
-    background: radial-gradient(700px 300px at 20% -10%, #dbeafe, transparent), #1d4ed8;
-    color:#fff; padding:28px;
-    display:flex; flex-direction:column; justify-content:space-between;
+
+  body {
+    background: var(--wild-sand);
+    color: black;
   }
-  .side h2 { margin:0 0 10px; font-weight:800; }
-  .side p { opacity:.95; }
-  .main { padding:28px; }
-  .title { font-size:28px; font-weight:800; color:var(--ink); margin:0 0 4px; }
-  .muted { color:var(--muted); margin-bottom:18px; }
-  .form-group{ margin-bottom:14px; }
-  .input {
-    width:100%; border:1px solid var(--ring); border-radius:12px; padding:12px 14px;
-    outline:none;
+
+  .login-card {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+    max-width: 400px;
+    margin: auto;
   }
-  .input:focus{ border-color:#93c5fd; box-shadow:0 0 0 4px rgba(147,197,253,.35); }
-  .row2 { display:grid; grid-template-columns: 1fr auto; gap:10px; align-items:center; }
-  .btn { border:none; border-radius:12px; padding:12px 14px; font-weight:700; }
-  .btn-primary { background:#111827; color:#fff; }
-  .alert { background:#fef2f2; color:#b91c1c; border:1px solid #fecaca; padding:10px 12px; border-radius:12px; margin-bottom:12px; }
-  .links { display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
-  .links a { color:#1d4ed8; }
+
+  .btn {
+    width: 100%;
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    font-weight: bold;
+    font-size: 16px;
+    color: #fff;
+    background: linear-gradient(90deg, var(--danube), var(--congress-blue));
+    cursor: pointer;
+    transition: transform 0.05s ease, box-shadow 0.2s ease;
+  }
+
+  .btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 14px rgba(0,0,0,0.15);
+  }
+
+  input[type="email"],
+  input[type="password"] {
+    width: 100%;
+    padding: 10px;
+    margin: 6px 0 12px;
+    border: 1px solid var(--iron);
+    border-radius: 6px;
+  }
+
+  h1, h2, h3, label {
+    color: black;
+  }
 </style>
 
-<div class="wrap">
-  <a class="back" href="/">&larr; Back</a>
-
-  <div class="card">
-    <div class="main">
-      <h1 class="title">Student Login</h1>
-      <p class="muted">Enter the email and password from your activation email.</p>
-
-      <% if (errM2) { %><div class="alert"><%= errM2 %></div><% } %>
-      <% if (errM)  { %><div class="alert"><%= errM  %></div><% } %>
-
-      <form action="/login" method="post" autocomplete="on">
-        <div class="form-group">
-          <label>Email</label>
-          <input class="input" type="email" name="email" required autocomplete="email">
-        </div>
-        <div class="form-group">
-          <label>Password</label>
-          <div class="row2">
-            <input class="input" id="pw" type="password" name="password" required autocomplete="current-password">
-            <button type="button" class="btn" id="togglePw" aria-controls="pw">Show</button>
-          </div>
-        </div>
-        <button class="btn btn-primary" type="submit">Sign in</button>
+<div id="login-page">
+  <h1>Student Login</h1>
+  <div id="login-container" class="container">
+    <div class="login-card">
+      <h2>Log In</h2>
+      <h3><%= errM %></h3>
+      <form action="/login" method="post">
+        <input class="top-input" type="email" name="email" placeholder="Email" required>
+        <input class="btm-input" type="password" name="password" placeholder="Password" required>
+        <button type="submit" class="btn">Submit</button>
       </form>
-
-      <div class="links">
-        <a href="/activate-account">Need to activate your account?</a>
-      </div>
-    </div>
-
-    <div class="side">
-      <div>
-        <h2>Apollo Youth in Medicine</h2>
-        <p>Access your shadowing matches, review details, and confirm participation from your portal.</p>
-      </div>
-      <small>Having trouble? Contact <a style="color:#fff;text-decoration:underline;" href="mailto:apolloyimde@gmail.com">apolloyimde@gmail.com</a></small>
     </div>
   </div>
 </div>
-
-<script>
-  const pw = document.getElementById('pw');
-  const toggle = document.getElementById('togglePw');
-  toggle?.addEventListener('click', () => {
-    const show = pw.type === 'password';
-    pw.type = show ? 'text' : 'password';
-    toggle.textContent = show ? 'Hide' : 'Show';
-    pw.focus();
-  });
-</script>
 
 <%- include("./partials/footer"); -%>
