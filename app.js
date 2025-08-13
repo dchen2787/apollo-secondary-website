@@ -224,7 +224,6 @@ function effectiveMaxSlots(ctrl) {
   return 0;
 }
 
-// Single place to render "home" with correct confirmed flag
 async function renderHome(res, userEmail, errM = "") {
   try {
     const [foundUser, slotsRaw, ctrl, confirmDoc] = await Promise.all([
@@ -234,14 +233,26 @@ async function renderHome(res, userEmail, errM = "") {
       userEmail ? Confirm.findOne({ email: userEmail }).lean() : null
     ]);
 
-    const slots = setDisplayValues(slotsRaw || []);
+    // filter adminOnly so students never see admin-only matches for themselves
+    const visibleSlotsRaw = (slotsRaw || []).filter(s => !(s.adminOnly && s.studentEmail && s.studentEmail.toLowerCase() === (userEmail||"").toLowerCase()));
+
+    const slots = setDisplayValues(visibleSlotsRaw || []);
     const confirmed = !!(confirmDoc && confirmDoc.confirmed);
 
-    // current student claimed count
-    let currentCount = 0;
-    if (userEmail) {
-      currentCount = await Slot.countDocuments({ studentEmail: userEmail });
-    }
+    res.render("home", {
+      user: foundUser,
+      slots,
+      controls: ctrl,
+      maxSlots: (ctrl && ctrl.maxSlots) || maxSlots,
+      errM,
+      confirmed,
+      isConfirmed: confirmed
+    });
+  } catch (e) {
+    console.error(e);
+    return errorPage(res, e);
+  }
+}
 
     res.render("home", {
       user: foundUser,
@@ -316,16 +327,22 @@ async function renderAdminHome(res, flashMsg = "", lyteOnly = false) {
 
     const { studentHours, hoursBySchool } = buildAdminAnalytics(slots, students, lyteOnly);
 
+    // NEW: archive buckets
+    const activeStudents = students.filter(s => !s.archived);
+    const archivedStudents = students.filter(s => s.archived);
+
     res.render("admin-home", {
       slots: array,
-      controls: ctrl,
-      maxSlots: effectiveMaxSlots(ctrl),
+      maxSlots: (ctrl && ctrl.maxSlots) || maxSlots,
       allGroups: allGroups.sort(),
       confirms,
       errM: flashMsg || "",
       studentHours,
       hoursBySchool,
-      lyteOnly
+      lyteOnly,
+      activeCount: activeStudents.length,
+      archivedCount: archivedStudents.length,
+      archivedStudents // for archive section
     });
   } catch (e) {
     return errorPage(res, e);
