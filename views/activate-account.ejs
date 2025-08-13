@@ -1,25 +1,88 @@
 <%- include("./partials/header"); -%>
-<div id="login-page">
 
-  <h1>Activate Account</h1>
-  <div id="login-container" class="container">
-    <div class="row">
-      <div class="col col-12 col-md-6">
-        <div class="login-card">
-          <h2>Enter Information</h2>
-          <h3><%=errM%></h3>
-          <form class="" action="/activate-account" method="post">
-            <input class="top-input" type="text" name="fName" value="" placeholder="First Name" required=true><br/>
-            <input type="text" name="lName" value="" placeholder="Last Name" required=true><br/>
-            <input type="email" name="email" value="" placeholder="Email" required=true><br/>
-            <input class="btm-input" type="password" name="password" value="" placeholder="Password" required=true>
-            <br />
-            <button type="submit" name="button" class="btn">Submit</button>
-          </form>
+<style>
+  :root{ --ring:#e5e7eb; --ink:#0f172a; --muted:#64748b; }
+  body { background: linear-gradient(180deg, #eef2ff, #f8fafc); }
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 32px 16px 64px; }
+  .card { background:#fff; border:1px solid var(--ring); border-radius:18px; overflow:hidden; box-shadow:0 10px 30px rgba(2,6,23,.08); }
+  .grid { display:grid; grid-template-columns: 1fr; }
+  @media (min-width: 900px){ .grid{ grid-template-columns: 1.1fr .9fr; } }
+  .main { padding:28px; }
+  .side {
+    background: radial-gradient(700px 300px at 20% -10%, #dbeafe, transparent), #1d4ed8;
+    color:#fff; padding:28px; display:flex; flex-direction:column; justify-content:space-between;
+  }
+  .title { font-size:28px; font-weight:800; color:var(--ink); margin:0 0 4px; }
+  .muted { color:var(--muted); margin-bottom:18px; }
+  .form-group{ margin-bottom:14px; }
+  .row2 { display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+  .input { width:100%; border:1px solid var(--ring); border-radius:12px; padding:12px 14px; }
+  .input:focus{ border-color:#93c5fd; box-shadow:0 0 0 4px rgba(147,197,253,.35); outline:none; }
+  .btn { border:none; border-radius:12px; padding:12px 14px; font-weight:700; }
+  .btn-primary { background:#111827; color:#fff; }
+  .alert { background:#fef2f2; color:#b91c1c; border:1px solid #fecaca; padding:10px 12px; border-radius:12px; margin-bottom:12px; }
+  .back { margin-bottom:16px; display:inline-block; }
+</style>
+
+<div class="wrap">
+  <a class="back" href="/">&larr; Back</a>
+
+  <div class="card grid">
+    <div class="main">
+      <h1 class="title">Activate Account</h1>
+      <p class="muted">Use the email and temporary password you received from Apollo. Then set your name to complete activation.</p>
+
+      <% if (errM2) { %><div class="alert"><%= errM2 %></div><% } %>
+      <% if (errM)  { %><div class="alert"><%= errM  %></div><% } %>
+
+      <form action="/activate-account" method="post" autocomplete="on">
+        <div class="form-group">
+          <label>Email</label>
+          <input class="input" type="email" name="email" required autocomplete="email">
         </div>
+
+        <div class="form-group">
+          <label>Temporary password</label>
+          <div style="display:grid; grid-template-columns: 1fr auto; gap:10px;">
+            <input class="input" id="pw" type="password" name="password" required autocomplete="current-password">
+            <button type="button" class="btn" id="togglePw">Show</button>
+          </div>
+        </div>
+
+        <div class="row2">
+          <div class="form-group">
+            <label>First name</label>
+            <input class="input" type="text" name="fName" required autocomplete="given-name">
+          </div>
+          <div class="form-group">
+            <label>Last name</label>
+            <input class="input" type="text" name="lName" required autocomplete="family-name">
+          </div>
+        </div>
+
+        <button class="btn btn-primary" type="submit">Activate</button>
+      </form>
+    </div>
+
+    <div class="side">
+      <div>
+        <h2>Welcome!</h2>
+        <p>Once activated, you’ll be able to browse open slots, match, and later confirm your schedule.</p>
       </div>
-  </div>
+      <small>Stuck? Email <a style="color:#fff;text-decoration:underline;" href="mailto:apolloyimde@gmail.com">apolloyimde@gmail.com</a></small>
+    </div>
   </div>
 </div>
+
+<script>
+  const pw = document.getElementById('pw');
+  const toggle = document.getElementById('togglePw');
+  toggle?.addEventListener('click', () => {
+    const show = pw.type === 'password';
+    pw.type = show ? 'text' : 'password';
+    toggle.textContent = show ? 'Hide' : 'Show';
+    pw.focus();
+  });
+</script>
 
 <%- include("./partials/footer"); -%>
