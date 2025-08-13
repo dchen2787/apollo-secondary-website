@@ -1,122 +1,47 @@
 <%- include("./partials/header"); -%>
 
 <style>
-  /* Color palette from your logo */
   :root {
     --congress-blue: #04488e;
     --danube: #74abdb;
-    --iron: #dbdbdc;
-    --cadet-blue: #a4b4c4;
-    --bermuda-gray: #6c8cac;
-    --wild-sand: #f6f6f6;
-    --pigeon-post: #aac6db;
-    --rock-blue: #a4b4cc;
-    --catskill-white: #ebf4f5;
   }
 
   body {
-    background: var(--wild-sand);
     color: black;
-    font-family: 'Segoe UI', Tahoma, sans-serif;
   }
 
-  .landing-container {
-    max-width: 640px;
-    margin: 0 auto;
-    padding: 40px 20px;
-    text-align: center;
-  }
-
-  .logo {
-    width: 140px;
-    margin-bottom: 20px;
-  }
-
-  h1 {
-    font-size: 2.2rem;
-    margin-bottom: 30px;
-    font-weight: 700;
-  }
-
-  .btn-xl {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    border: none;
-    border-radius: 14px;
-    padding: 14px 16px;
-    width: 100%;
-    font-weight: 700;
-    color: black;
-    box-shadow: 0 10px 30px rgba(2,6,23,.08);
-    transition: transform .04s ease, box-shadow .2s ease, border-color .2s ease;
-    font-size: 1.05rem;
-    cursor: pointer;
-  }
-
-  .btn-xl:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 14px 36px rgba(2,6,23,.12);
-  }
-
-  /* Student Login gradient */
+  /* Gradient for Student Login button */
   .btn-apollo {
     background: linear-gradient(90deg, var(--danube), var(--congress-blue));
-    color: black;
+    color: white !important;
   }
+
   .btn-apollo:hover {
     background: linear-gradient(90deg, #84bce6, #0559a8);
-  }
-
-  /* Secondary buttons */
-  .btn-secondary {
-    background: var(--catskill-white);
-    border: 1px solid var(--iron);
-  }
-  .btn-secondary:hover {
-    background: var(--pigeon-post);
-  }
-
-  .btn-wrapper {
-    margin-bottom: 16px;
-  }
-
-  .icon {
-    font-size: 1.2em;
+    color: white !important;
   }
 </style>
 
-<div class="landing-container">
-  <img src="/images/apollo logo.jpeg" alt="Apollo Logo" class="logo">
+<div class="container" style="margin-top:40px;">
   <h1>Welcome to Apollo's Match Portal!</h1>
 
-  <div class="btn-wrapper">
-    <form action="/login" method="get">
-      <button class="btn-xl btn-apollo" type="submit">
-        Student Login
-        <span class="icon">➜</span>
-      </button>
-    </form>
-  </div>
+  <form action="/login" method="get" style="margin-top:20px;">
+    <button class="btn btn-lg btn-apollo" type="submit">
+      Student Login <i class="fas fa-arrow-right"></i>
+    </button>
+  </form>
 
-  <div class="btn-wrapper">
-    <form action="/activate" method="get">
-      <button class="btn-xl btn-secondary" type="submit">
-        Activate Account
-        <span class="icon">➜</span>
-      </button>
-    </form>
-  </div>
+  <form action="/activate" method="get" style="margin-top:15px;">
+    <button class="btn btn-lg btn-secondary" type="submit">
+      Activate Account <i class="fas fa-arrow-right"></i>
+    </button>
+  </form>
 
-  <div class="btn-wrapper">
-    <form action="/admin-login" method="get">
-      <button class="btn-xl btn-secondary" type="submit">
-        Admin Login
-        <span class="icon">➜</span>
-      </button>
-    </form>
-  </div>
+  <form action="/admin-login" method="get" style="margin-top:15px;">
+    <button class="btn btn-lg btn-secondary" type="submit">
+      Admin Login
+    </button>
+  </form>
 </div>
 
 <%- include("./partials/footer"); -%>
