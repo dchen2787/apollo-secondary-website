@@ -20,7 +20,7 @@
   /* Alerts */
   .alert { position:relative; border-radius:14px; padding:10px 40px 10px 12px; margin:8px 0; }
   .alert-info { background:#eff6ff; color:#1d4ed8; }
-  .alert-success { background:#ecfdf5; color:#065f46; }
+  .alert-success { background: #ecfdf5;  /* light green background */ color: #065f46;       /* dark green text */ }
   .alert-warning { background:#fff7ed; color:#9a3412; }
   .alert .close { position:absolute; right:10px; top:8px; background:transparent; border:0; font-size:20px; line-height:1; color:inherit; opacity:.6; }
 
@@ -109,7 +109,9 @@
   <% } %>
 
   <% if (errM && errM.length) { %>
-    <div class="alert alert-info">
+    <% const successPhrases = ["successfully matched", "successfully removed", "successfully confirmed"]; %>
+    <% const isSuccess = successPhrases.some(p => errM.toLowerCase().includes(p)); %>
+    <div class="alert <%= isSuccess ? 'alert-success' : 'alert-info' %>">
       <%= errM %>
       <button type="button" class="close" aria-label="Close">&times;</button>
     </div>
