@@ -503,11 +503,14 @@ app.post("/login", function(req,res){
   Student.findOne({email}, function(err, foundUser){
     if(err) return res.render("login", {errM:"", errM2:"An error occured. Please try again."});
     if(!foundUser) return res.render("login", {errM:"", errM2:"Username or password was incorrect."});
+    if(foundUser.archived) {
+      return res.render("login", {errM:"", errM2:"This account has been archived. Please contact apolloyimde@gmail.com if you believe this is an error."});
+    }
     if(!foundUser.fName) {
       return res.render("login", {errM:"", errM2:"Account not activated. Please activate your account (https://the-match-apolloyim-2f158c0ae122.herokuapp.com/activate-account) or contact apolloyimde@gmail.com."});
     }
 
-    bcrypt.compare(password, foundUser.password, async function(err, ok){
+    bcrypt.compare(password, foundUser.password, function(err, ok){
       if(err || !ok) return res.render("login", {errM:"", errM2:"Username or password was incorrect."});
       return renderHome(res, foundUser.email, "");
     });
