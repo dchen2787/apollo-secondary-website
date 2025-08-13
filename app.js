@@ -415,6 +415,106 @@ app.post("/admin-login", function(req, res) {
   });
 });
 
+// --- Admin Search (rich results page) ---
+app.get("/admin/search", async function(req, res) {
+  try {
+    const qRaw = (req.query.q || "").trim();
+    const q = qRaw;
+    const hasQuery = q.length > 0;
+
+    // Fetch everything we might need up front
+    const [allSlotsRaw, allStudents, allConfirms] = await Promise.all([
+      Slot.find({}).lean(),
+      Student.find({}).lean(),
+      Confirm.find({}).lean()
+    ]);
+
+    // Pre-format slots for dDate etc.
+    const allSlots = setDisplayValues(allSlotsRaw || []);
+
+    // Build confirm map
+    const confirmMap = new Map();
+    (allConfirms || []).forEach(c => confirmMap.set((c.email || "").toLowerCase(), !!c.confirmed));
+
+    // If no query, just render the search UI empty
+    if (!hasQuery) {
+      return res.render("admin-search", {
+        query: "",
+        studentResults: [],
+        physicianGroups: [],
+        totalStudents: allStudents.length,
+        totalSlots: allSlots.length
+      });
+    }
+
+    // Safe fuzzy regex (case-insensitive)
+    const rx = new RegExp(_.escapeRegExp(q), "i");
+
+    // --- Match students by fName, lName, or email ---
+    const studentResults = (allStudents || [])
+      .filter(s =>
+        rx.test(s.email || "") ||
+        rx.test(s.fName || "") ||
+        rx.test(s.lName || "")
+      )
+      .map(s => {
+        const email = (s.email || "").toLowerCase();
+
+        // Slots claimed by this student
+        const mySlots = allSlots.filter(sl => (sl.studentEmail || "").toLowerCase() === email);
+
+        // Totals
+        const totalHours = mySlots.reduce((sum, sl) => sum + slotHours(sl), 0);
+        const totalSlots = mySlots.length;
+
+        return {
+          name: [s.fName, s.lName].filter(Boolean).join(" ") || "(no name)",
+          email,
+          group: s.group || "",
+          school: s.school || "",
+          isLyte: !!s.isLyte,
+          matchingLocked: !!s.matchingLocked,
+          confirmed: !!confirmMap.get(email),
+          totalHours: Math.round(totalHours * 100) / 100,
+          totalSlots,
+          slots: mySlots // already display-formatted with dDate
+        };
+      })
+      .sort((a, b) => b.totalHours - a.totalHours);
+
+    // --- Match physicians by physician name (and show all their slots) ---
+    const matchedSlots = allSlots.filter(sl => rx.test(sl.physName || ""));
+    // Group by Physician + Specialty for a clean panel
+    const groupMap = new Map();
+    matchedSlots.forEach(sl => {
+      const key = `${sl.physName || "Unknown"}|${sl.physSpecialty || ""}`;
+      if (!groupMap.has(key)) groupMap.set(key, []);
+      groupMap.get(key).push(sl);
+    });
+
+    const physicianGroups = Array.from(groupMap.entries()).map(([key, items]) => {
+      const [physName, physSpecialty] = key.split("|");
+      // sort by date/timeStart
+      items.sort((a, b) => {
+        const at = a.date ? new Date(a.date).getTime() : 0;
+        const bt = b.date ? new Date(b.date).getTime() : 0;
+        return at - bt;
+      });
+      return { physName, physSpecialty, slots: items };
+    });
+
+    return res.render("admin-search", {
+      query: q,
+      studentResults,
+      physicianGroups,
+      totalStudents: allStudents.length,
+      totalSlots: allSlots.length
+    });
+  } catch (e) {
+    return errorPage(res, e);
+  }
+});
+
 // Activate account
 app.post("/activate-account", function(req,res){
   const email = _.toLower(req.body.email);
