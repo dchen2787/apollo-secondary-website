@@ -56,6 +56,13 @@ const studentSchema = new mongoose.Schema({
 });
 const Student = mongoose.model("Student", studentSchema);
 
+// Admin
+const adminSchema = new mongoose.Schema({
+  fName:String, lName:String, password:String, email:String, permissions:Array
+});
+const Admin = mongoose.model("Admin", adminSchema);
+
+
 const confirmSchema = new mongoose.Schema({
   email: String,
   confirmed: Boolean
@@ -224,44 +231,35 @@ function effectiveMaxSlots(ctrl) {
   return 0;
 }
 
+
+// Single place to render "home" with correct phase & counts
 async function renderHome(res, userEmail, errM = "") {
   try {
-    const [foundUser, slotsRaw, ctrl, confirmDoc] = await Promise.all([
+    const [foundUser, slotsRaw, ctrl, confirmDoc, myCount] = await Promise.all([
       userEmail ? Student.findOne({ email: userEmail }).lean() : null,
       Slot.find({}).lean(),
       Control.findOne({ id: 1 }).lean(),
-      userEmail ? Confirm.findOne({ email: userEmail }).lean() : null
+      userEmail ? Confirm.findOne({ email: userEmail }).lean() : null,
+      userEmail ? Slot.countDocuments({ studentEmail: (userEmail || "").toLowerCase() }) : Promise.resolve(0)
     ]);
 
-    // filter adminOnly so students never see admin-only matches for themselves
-    const visibleSlotsRaw = (slotsRaw || []).filter(s => !(s.adminOnly && s.studentEmail && s.studentEmail.toLowerCase() === (userEmail||"").toLowerCase()));
+    // hide admin-only slots from the student's view (when assigned to that student)
+    const visibleSlotsRaw = (slotsRaw || []).filter(
+      s => !(s.adminOnly && (s.studentEmail || "").toLowerCase() === (userEmail || "").toLowerCase())
+    );
 
-    const slots = setDisplayValues(visibleSlotsRaw || []);
+    const slots = setDisplayValues(visibleSlotsRaw);
     const confirmed = !!(confirmDoc && confirmDoc.confirmed);
+    const phaseVal  = ctrl?.phase ?? 3;
 
     res.render("home", {
       user: foundUser,
       slots,
       controls: ctrl,
-      maxSlots: (ctrl && ctrl.maxSlots) || maxSlots,
-      errM,
-      confirmed,
-      isConfirmed: confirmed
-    });
-  } catch (e) {
-    console.error(e);
-    return errorPage(res, e);
-  }
-}
-
-    res.render("home", {
-      user: foundUser,
-      slots,
-      controls: ctrl,
-      phase: ctrl?.phase ?? 3,
-      phaseName: phaseName(ctrl?.phase),
-      maxSlots: effectiveMaxSlots(ctrl),
-      currentCount,
+      phase: phaseVal,
+      phaseName: phaseName(phaseVal),
+      maxSlots: effectiveMaxSlots(ctrl), // 0 means unlimited
+      currentCount: myCount,
       errM,
       confirmed,
       isConfirmed: confirmed
@@ -336,7 +334,7 @@ async function renderAdminHome(res, flashMsg = "", lyteOnly = false, includeArch
 
     res.render("admin-home", {
       slots: array,
-      maxSlots: (ctrl && ctrl.maxSlots) || maxSlots,
+      maxSlots: ctrl?.maxSlots ?? defaultMaxSlots,
       allGroups: allGroups.sort(),
       confirms,
       errM: flashMsg || "",
@@ -352,6 +350,7 @@ async function renderAdminHome(res, flashMsg = "", lyteOnly = false, includeArch
     return errorPage(res, e);
   }
 }
+
 
 // ---- CSV helpers ----
 function csvEscape(val) {
