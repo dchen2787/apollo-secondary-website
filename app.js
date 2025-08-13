@@ -736,6 +736,103 @@ app.post("/admin-clear-confirm", async function(req, res) {
   }
 });
 
+// Admin: student detail page (all-time matches)
+app.get("/admin/student/:email", async function(req, res) {
+  try {
+    const email = _.toLower(decodeURIComponent(req.params.email || "").trim());
+    if (!email) return errorPage(res, new Error("Missing email"));
+
+    const [student, slots] = await Promise.all([
+      Student.findOne({ email }).lean(),
+      Slot.find({ studentEmail: email }).lean()
+    ]);
+
+    if (!student) return errorPage(res, new Error("Student not found"));
+
+    // Mark upcoming vs past based on 'date'
+    const now = new Date().getTime();
+    const allSlots = (slots || []).map(s => {
+      const dt = s.date ? new Date(s.date).getTime() : 0;
+      return { ...s, isPast: dt && dt < now };
+    }).sort((a,b) => {
+      const at = a.date ? new Date(a.date).getTime() : 0;
+      const bt = b.date ? new Date(b.date).getTime() : 0;
+      return bt - at; // newest first
+    });
+
+    res.render("admin-student", {
+      student,
+      slots: setDisplayValues(allSlots),
+      errM: ""
+    });
+  } catch (e) {
+    return errorPage(res, e);
+  }
+});
+
+// Admin: remove a single slot (unclaim)
+app.post("/admin/student/remove-slot", async function(req, res) {
+  try {
+    const slotId = req.body.slotId;
+    const email = _.toLower(req.body.email || "");
+    if (!slotId || !email) return errorPage(res, new Error("Missing data"));
+
+    await Slot.updateOne({ _id: slotId }, { $set: { studentName: "", studentEmail: "", adminOnly: false } });
+    return res.redirect(`/admin/student/${encodeURIComponent(email)}`);
+  } catch (e) {
+    return errorPage(res, e);
+  }
+});
+
+// Admin: manually assign a slot to student (admin-only so student view won’t show it)
+app.post("/admin/student/add-slot", async function(req, res) {
+  try {
+    const slotId = req.body.slotId;
+    const email  = _.toLower(req.body.email || "");
+    if (!slotId || !email) return errorPage(res, new Error("Missing data"));
+
+    const student = await Student.findOne({ email }).lean();
+    if (!student) return errorPage(res, new Error("Student not found"));
+
+    const name = [student.fName, student.lName].filter(Boolean).join(" ").trim();
+
+    const slot = await Slot.findOne({ _id: slotId }).lean();
+    if (!slot) return errorPage(res, new Error("Slot not found"));
+    if (slot.studentEmail && slot.studentEmail.length) {
+      return errorPage(res, new Error("Slot is already claimed."));
+    }
+
+    await Slot.updateOne(
+      { _id: slotId },
+      { $set: { studentName: name || email, studentEmail: email, adminOnly: true } }
+    );
+
+    return res.redirect(`/admin/student/${encodeURIComponent(email)}`);
+  } catch (e) {
+    return errorPage(res, e);
+  }
+});
+
+// Admin: archive / unarchive a student
+app.post("/admin/student/archive", async function(req, res) {
+  try {
+    const email = _.toLower(req.body.email || "");
+    const action = (req.body.action || "").toLowerCase(); // "archive" | "unarchive"
+    if (!email) return errorPage(res, new Error("Missing email"));
+
+    const archived = (action === "archive");
+    await Student.updateOne({ email }, { $set: { archived } });
+
+    // Redirect back to student page if we came from there, else admin home
+    if (req.get("referer") && req.get("referer").includes(`/admin/student/`)) {
+      return res.redirect(`/admin/student/${encodeURIComponent(email)}`);
+    }
+    return renderAdminHome(res, archived ? "Student archived." : "Student unarchived.");
+  } catch (e) {
+    return errorPage(res, e);
+  }
+});
+
 // ---- Server ----
 let port = process.env.PORT;
 if(!port) port = 3000;
