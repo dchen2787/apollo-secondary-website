@@ -1,1 +1,166 @@
+<%- include("./partials/header"); -%>
 
+<style>
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 24px 16px 64px; }
+  .topline { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom: 16px; }
+  .back { color:#111827; }
+  h1 { margin: 6px 0 8px; font-weight:800; }
+  .muted { color:#6b7280; }
+
+  .searchbar-wrap {
+    display:flex; gap:8px; flex-wrap:wrap; align-items:center; 
+    background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:10px; 
+    box-shadow:0 8px 24px rgba(0,0,0,.05);
+    margin-bottom: 16px;
+  }
+  .searchbar-wrap input[type="text"] {
+    flex:1;
+    border:1px solid #e5e7eb; border-radius:10px; padding:10px 12px; min-width: 240px;
+  }
+  .btn { border:none; border-radius:10px; padding:10px 14px; font-weight:700; }
+  .btn-primary { background:#111827; color:#fff; }
+
+  .section { margin-top: 24px; }
+  .section h2 { margin: 0 0 8px; font-size: 20px; font-weight: 700; }
+  .card {
+    background:#fff; border:1px solid #e5e7eb; border-radius:14px; padding:14px;
+    box-shadow:0 6px 18px rgba(0,0,0,.05); margin-bottom:12px;
+  }
+
+  .student-head { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .pill { display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; }
+  .pill-lyte { background:#eef2ff; color:#1d4ed8; }
+  .pill-confirm { background:#ecfdf5; color:#065f46; }
+  .pill-lock { background:#fff7ed; color:#9a3412; }
+
+  .grid2 { display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+  @media (max-width: 800px){ .grid2 { grid-template-columns: 1fr; } }
+
+  .kv { display:flex; gap:6px; }
+  .kv b { min-width: 120px; }
+
+  .slot-list .slot-item { border-top:1px dashed #e5e7eb; padding-top:10px; margin-top:10px; }
+  .tag { display:inline-block; background:#dbeafe; color:#1e3a8a; border-radius:999px; padding:2px 10px; font-size:12px; margin-left:6px; }
+  .tag-nonpcp { background:#fef3c7; color:#92400e; }
+</style>
+
+<div class="wrap">
+  <div class="topline">
+    <a class="back" href="/admin">&larr; Back to Admin</a>
+    <span class="muted">|</span>
+    <span class="muted">Search across students & physicians</span>
+  </div>
+
+  <h1>Admin Search</h1>
+  <form class="searchbar-wrap" action="/admin/search" method="get">
+    <input type="text" name="q" value="<%= query %>" placeholder="Type student name/email or physician name…" autofocus>
+    <button class="btn btn-primary" type="submit">Search</button>
+  </form>
+  <div class="muted">
+    Dataset: <%= totalStudents %> students, <%= totalSlots %> slots.
+    <% if (!query || !query.trim()) { %> Enter a search term to get started. <% } %>
+  </div>
+
+  <% if (query && query.trim()) { %>
+    <!-- Students -->
+    <div class="section">
+      <h2>Student matches (<%= studentResults.length %>)</h2>
+      <% if (studentResults.length === 0) { %>
+        <div class="muted">No students matched "<%= query %>".</div>
+      <% } %>
+
+      <% studentResults.forEach(function(s){ %>
+        <div class="card">
+          <div class="student-head">
+            <div>
+              <div style="font-size:18px; font-weight:700;">
+                <%= s.name %> <span class="muted">(<%= s.email %>)</span>
+                <% if (s.isLyte) { %><span class="pill pill-lyte">LYTE</span><% } %>
+                <% if (s.confirmed) { %><span class="pill pill-confirm">Confirmed</span><% } %>
+                <% if (s.matchingLocked) { %><span class="pill pill-lock">Matching Locked</span><% } %>
+              </div>
+              <div class="muted" style="margin-top:2px;">
+                <%= s.school || "(No school)" %> • Group: <%= s.group || "-" %>
+              </div>
+            </div>
+            <div class="muted">
+              <b><%= s.totalHours.toFixed(2) %> hrs</b> • <b><%= s.totalSlots %></b> slot(s)
+            </div>
+          </div>
+
+          <% if (s.slots.length) { %>
+            <div class="slot-list" style="margin-top:10px;">
+              <% s.slots.forEach(function(sl){ 
+                   const isPCP = ['Family Medicine (PCP)','Primary Care'].includes((sl.physSpecialty||'').trim());
+              %>
+                <div class="slot-item">
+                  <div>
+                    <b><%= sl.physName || '—' %></b>
+                    <% if (sl.physSpecialty) { %>
+                      <span class="tag"><%= sl.physSpecialty %></span>
+                      <% if (!isPCP) { %><span class="tag tag-nonpcp">Non‑PCP</span><% } %>
+                    <% } %>
+                  </div>
+                  <div class="muted">
+                    <%= sl.dDate || '-' %> • <%= sl.timeStart || '-' %> to <%= sl.timeEnd || '-' %> • <%= sl.location || '-' %>
+                  </div>
+                  <% if (sl.notes && sl.notes.trim()) { %>
+                    <div class="muted"><em>Notes:</em> <%= sl.notes %></div>
+                  <% } %>
+                </div>
+              <% }) %>
+            </div>
+          <% } else { %>
+            <div class="muted" style="margin-top:8px;">No claimed slots.</div>
+          <% } %>
+        </div>
+      <% }) %>
+    </div>
+
+    <!-- Physicians -->
+    <div class="section" style="margin-top:28px;">
+      <h2>Physician matches (<%= physicianGroups.length %>)</h2>
+      <% if (physicianGroups.length === 0) { %>
+        <div class="muted">No physicians matched "<%= query %>".</div>
+      <% } %>
+
+      <% physicianGroups.forEach(function(g){ %>
+        <div class="card">
+          <div style="font-size:18px; font-weight:700;">
+            <%= g.physName || '—' %>
+            <% if (g.physSpecialty) { %><span class="tag"><%= g.physSpecialty %></span><% } %>
+          </div>
+          <div class="slot-list" style="margin-top:10px;">
+            <% g.slots.forEach(function(sl){
+                 const isTaken = !!(sl.studentEmail && sl.studentEmail.length);
+                 const isPCP = ['Family Medicine (PCP)','Primary Care'].includes((sl.physSpecialty||'').trim());
+            %>
+              <div class="slot-item">
+                <div class="muted">
+                  <b><%= sl.dDate || '-' %></b> • <%= sl.timeStart || '-' %>–<%= sl.timeEnd || '-' %> • <%= sl.location || '-' %>
+                </div>
+                <div>
+                  <% if (isTaken) { %>
+                    <span class="pill" style="background:#fee2e2;color:#b91c1c;">Taken</span>
+                    <span class="muted">by <%= sl.studentName || '' %> <%= sl.studentEmail ? '(' + sl.studentEmail + ')' : '' %></span>
+                  <% } else { %>
+                    <span class="pill" style="background:#ecfeff;color:#0e7490;">Open</span>
+                  <% } %>
+                  <% if (sl.physSpecialty) { %>
+                    <span class="tag"><%= sl.physSpecialty %></span>
+                    <% if (!isPCP) { %><span class="tag tag-nonpcp">Non‑PCP</span><% } %>
+                  <% } %>
+                </div>
+                <% if (sl.notes && sl.notes.trim()) { %>
+                  <div class="muted"><em>Notes:</em> <%= sl.notes %></div>
+                <% } %>
+              </div>
+            <% }) %>
+          </div>
+        </div>
+      <% }) %>
+    </div>
+  <% } %>
+</div>
+
+<%- include("./partials/footer"); -%>
