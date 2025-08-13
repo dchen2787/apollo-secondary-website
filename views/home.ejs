@@ -20,14 +20,14 @@
   /* Alerts */
   .alert { position:relative; border-radius:14px; padding:10px 40px 10px 12px; margin:8px 0; }
   .alert-info { background:#eff6ff; color:#1d4ed8; }
-  .alert-success { background: #ecfdf5;  /* light green background */ color: #065f46;       /* dark green text */ }
+  .alert-success { background:#ecfdf5; color:#065f46; } /* green */
   .alert-warning { background:#fff7ed; color:#9a3412; }
   .alert .close { position:absolute; right:10px; top:8px; background:transparent; border:0; font-size:20px; line-height:1; color:inherit; opacity:.6; }
 
   /* Phase banner (big and obvious for PCP only) */
   .phase-banner { border-radius:16px; padding:14px 16px; border:1px solid #dbeafe; background:#eff6ff; color:#1e3a8a; margin:12px 0; }
   .phase-banner.p0 { background:#f3f4f6; border-color:#e5e7eb; color:#111827; }
-  .phase-banner.p1 { background:#fff1f2; border-color:#fecaca; color:#991b1b; } /* PCP only: more obvious */
+  .phase-banner.p1 { background:#fff1f2; border-color:#fecaca; color:#991b1b; } /* PCP only: louder */
   .phase-banner p { margin:0; }
 
   /* Locked banner (permanent) */
@@ -83,23 +83,42 @@
 
 <div class="container">
 
-  <!-- Phase banner -->
-  <div class="phase-banner p<%= phase %>">
-    <strong><%= phaseName %></strong>
-    <p style="margin-top:4px;">
-      <% if (phase === 0) { %>
-        View-only: you can browse slots but cannot claim yet.
-      <% } else if (phase === 1) { %>
-        PCP-only: you may claim <strong>Primary Care</strong> slots only. Non‑PCP slots are temporarily unavailable.
-      <% } else if (phase === 2) { %>
-        You may claim up to <strong>2</strong> slots total this phase.
-      <% } else { %>
-        You may claim an <strong>unlimited</strong> number of slots (subject to availability).
-      <% } %>
-    </p>
-  </div>
+  <% /* ---------- derive phase + counters up front ---------- */ %>
+  <%
+    const matchingLocked = !!(controls && controls.matchingLocked);
+    const pcpOnlyFlag   = !!(controls && controls.PCPonly);
+    const maxAllowed    = (typeof maxSlots === 'number' ? maxSlots : 9999);
 
-  <% if (controls && controls.matchingLocked) { %>
+    // Your current picks:
+    const mySlotsAll    = (slots || []).filter(s => s.studentEmail === user.email);
+    const currentCount  = mySlotsAll.length;
+
+    // Phase logic:
+    let phase = 3, phaseName = "Phase 3: Unlimited";
+    if (matchingLocked) { phase = 0; phaseName = "Phase 0: View Only"; }
+    else if (pcpOnlyFlag) { phase = 1; phaseName = "Phase 1: PCP Only"; }
+    else if (maxAllowed === 2) { phase = 2; phaseName = "Phase 2: Two‑slot Limit"; }
+  %>
+
+  <% /* Phase banner (HIDDEN when locked) */ %>
+  <% if (!matchingLocked) { %>
+    <div class="phase-banner p<%= phase %>">
+      <strong><%= phaseName %></strong>
+      <p style="margin-top:4px;">
+        <% if (phase === 0) { %>
+          View‑only: you can browse slots but cannot claim yet.
+        <% } else if (phase === 1) { %>
+          PCP‑only: you may claim <strong>Primary Care</strong> slots only. Non‑PCP slots are temporarily unavailable.
+        <% } else if (phase === 2) { %>
+          You may claim up to <strong>2</strong> slots total this phase.
+        <% } else { %>
+          You may claim an <strong>unlimited</strong> number of slots (subject to availability).
+        <% } %>
+      </p>
+    </div>
+  <% } %>
+
+  <% if (matchingLocked) { %>
     <div class="lock-banner-wrap">
       <div class="lock-banner">
         Matching is currently locked. You can review your matches but cannot add new ones.
@@ -111,9 +130,9 @@
   <% if (errM && errM.length) { %>
     <% const successPhrases = ["successfully matched", "successfully removed", "successfully confirmed"]; %>
     <% const isSuccess = successPhrases.some(p => errM.toLowerCase().includes(p)); %>
-    <div class="alert <%= isSuccess ? 'alert-success' : 'alert-info' %>">
+    <div class="alert <%= isSuccess ? 'alert-success alert-sticky' : 'alert-info' %>">
       <%= errM %>
-      <button type="button" class="close" aria-label="Close">&times;</button>
+      <% if (!isSuccess) { %><button type="button" class="close" aria-label="Close">&times;</button><% } %>
     </div>
   <% } %>
 
@@ -128,7 +147,7 @@
       <h1 style="margin:0;"><%= user && user.fName ? user.fName : (user?.email || "Student") %></h1>
     </div>
     <div style="margin-left:auto;">
-      <% if ((controls && controls.matchingLocked) && !confirmed) { %>
+      <% if (matchingLocked && !confirmed) { %>
         <form action="/confirm" method="post">
           <input type="hidden" name="userEmail" value="<%= user.email %>">
           <button class="btn-soft">Confirm My Slots</button>
@@ -137,18 +156,15 @@
     </div>
   </div>
 
-  <% const matchingLocked = !!(controls && controls.matchingLocked); %>
-
   <!-- Your Matches -->
   <div class="section-block your">
     <h2 class="section-title">Your Matches</h2>
     <%
-      const mySlots = (slots || []).filter(s => s.studentEmail === user.email);
-      if (mySlots.length === 0) { %>
+      if (mySlotsAll.length === 0) { %>
         <div class="muted" style="margin-bottom:12px;">You haven’t claimed any slots yet.</div>
     <% } %>
     <% const PCPonly = (phase === 1); %>
-    <% mySlots.forEach(function(slot){
+    <% mySlotsAll.forEach(function(slot){
          const isPCP = ['Family Medicine (PCP)','Primary Care'].includes((slot.physSpecialty||'').trim());
     %>
       <div class="slot-card">
@@ -173,18 +189,17 @@
       </div>
     <% }); %>
     <% if (confirmed) { %>
-      <div class="alert alert-success" style="margin-top:10px;">
-        You have confirmed your slots.
+      <div class="alert alert-success alert-sticky" style="margin-top:10px;">
+        Your slots have been confirmed.
       </div>
     <% } %>
 
-    <!-- Guidance text only when locked/confirm page -->
     <% if (matchingLocked) { %>
       <hr />
       <p style="font-size:18px; line-height:1.4; margin:16px 0 0;">
-        To confirm that you are willing and able to attend all the slots above, press the <strong>confirm</strong> button.
-        Please remember to check date and location information carefully. If you are unable to attend any of the slots above, please <strong>remove</strong> them before confirming.
-        If you have any questions about your slots, contact the Apollo Team via email immediately.
+        To confirm that you are willing and able to attend all the slots above, press the <strong>Confirm</strong> button.
+        Check date and location carefully. If you are unable to attend any of the slots above, please <strong>remove</strong> them before confirming.
+        Questions? Email the Apollo Team immediately.
       </p>
     <% } %>
   </div>
@@ -230,7 +245,7 @@
         <% (slots || []).forEach(function(slot){
              const isPCP2 = ['Family Medicine (PCP)','Primary Care'].includes((slot.physSpecialty||'').trim());
 
-             // Compute button disable reason by phase
+             // Disable reason by phase
              let claimDisabledReason = null;
              if (phase === 0) claimDisabledReason = "View-only phase";
              else if (phase === 1 && !isPCP2) claimDisabledReason = "PCP-only is active";
@@ -245,7 +260,7 @@
             <div class="head">
               <strong><%= slot.physName || '—' %></strong>
               <% if (slot.physSpecialty) { %><span class="badge-soft"><%= slot.physSpecialty %></span><% } %>
-              <% if ((phase === 1) && slot.physSpecialty && !isPCP2) { %><span class="pill-nonpcp">Non‑PCP</span><% } %>
+              <% if (phase === 1 && slot.physSpecialty && !isPCP2) { %><span class="pill-nonpcp">Non‑PCP</span><% } %>
             </div>
             <div class="muted" style="margin:6px 0;">
               <strong><%= slot.dDate || '-' %></strong> • <%= (slot.timeStart || '-') %> to <%= (slot.timeEnd || '-') %> • <%= slot.location || '-' %>
@@ -342,16 +357,18 @@
     updateSpecHint(); apply();
   })();
 </script>
+
 <script>
-  // Auto-dismiss alerts after 5 seconds
+  // Auto-dismiss alerts after 5s, but NOT sticky success banners
   setTimeout(() => {
-    document.querySelectorAll('.alert').forEach(el => {
+    document.querySelectorAll('.alert:not(.alert-sticky)').forEach(el => {
       el.style.transition = 'opacity 0.5s ease';
       el.style.opacity = '0';
-      setTimeout(() => el.remove(), 500); // wait for fade before removing
+      setTimeout(() => el.remove(), 500);
     });
   }, 5000);
 </script>
+
 <!-- Bootstrap (needed for dropdown) -->
 <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
