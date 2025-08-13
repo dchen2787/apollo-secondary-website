@@ -24,17 +24,14 @@ mongoose.connect(
 );
 
 // ---- Schemas / Models ----
-const adminSchema = new mongoose.Schema({
-  fName:String, lName:String, password:String, email:String, permissions:Array
-});
-const Admin = mongoose.model("Admin", adminSchema);
 
+// Slot
 const slotSchema = new mongoose.Schema({
   physName: String,
   date: Date,
-  timeStart: String,     // "9:00 AM"
+  timeStart: String,
   physSpecialty:String,
-  timeEnd: String,       // "11:30 AM"
+  timeEnd: String,
   location:String,
   notes:String,
   testId:String,
@@ -42,16 +39,20 @@ const slotSchema = new mongoose.Schema({
   studentEmail:String,
   dDate:String,
   dTime:String,
-  filled: Boolean
+  filled: Boolean,
+  // NEW: if true and assigned by admin, hide from student portal
+  adminOnly: { type: Boolean, default: false }
 });
 const Slot = mongoose.model("Slot", slotSchema);
 
+// Student
 const studentSchema = new mongoose.Schema({
   fName:String, lName:String, password:String, email:String, appId:String,
   group:String, matchingLocked: Boolean,
-  // NEW fields for admin analytics/filters
   isLyte: { type: Boolean, default: false },
-  school: { type: String, default: "" }
+  school: { type: String, default: "" },
+  // NEW: archived students cannot log in, but remain visible in admin
+  archived: { type: Boolean, default: false }
 });
 const Student = mongoose.model("Student", studentSchema);
 
