@@ -55,6 +55,8 @@
   /* Tables/list rows */
   .row-head { font-weight: 700; }
   .row { align-items: center; }
+
+  .phase-note { font-size: 13px; color: #374151; margin-top:6px; }
 </style>
 
 <div class="container">
@@ -78,12 +80,11 @@
     <!-- Main Content -->
     <div class="admin-main">
 
-      <!-- search -->
+      <!-- quick search (unchanged) -->
       <form action="/admin/search" method="get" class="form-inline" style="margin: 8px 0;">
         <input class="form-control" type="text" name="q" placeholder="Search students or physicians">
         <button class="btn" type="submit" style="margin-left:8px;">Search</button>
       </form>
-
 
       <!-- Create Accounts -->
       <section id="sec-accounts" class="cardish">
@@ -207,7 +208,18 @@
         <div id="matchBody">
           <form action="/admin-matchSettings" method="post">
             <div class="form-group">
-              <label>Max Slots Per Student:</label>
+              <label style="display:block; font-weight:600;">Phase</label>
+              <label style="display:block;"><input type="radio" name="phase" value="0" <%= (controls && controls.phase===0) ? "checked" : "" %>> Phase 0 — View only</label>
+              <label style="display:block;"><input type="radio" name="phase" value="1" <%= (controls && controls.phase===1) ? "checked" : "" %>> Phase 1 — PCP only</label>
+              <label style="display:block;"><input type="radio" name="phase" value="2" <%= (controls && controls.phase===2) ? "checked" : "" %>> Phase 2 — Up to 2 slots</label>
+              <label style="display:block;"><input type="radio" name="phase" value="3" <%= (controls && controls.phase===3) ? "checked" : "" %>> Phase 3 — Unlimited</label>
+              <div class="phase-note">
+                In Phase 3 you can optionally cap with "Max Slots Per Student" below. In Phase 2 the cap is always 2.
+              </div>
+            </div>
+
+            <div class="form-group" style="margin-top:10px;">
+              <label>Max Slots Per Student (Phase 3 cap or general cap):</label>
               <input type="number" name="maxSlots" value="<%= maxSlots %>" class="form-control" style="max-width:200px;">
             </div>
 
@@ -358,7 +370,6 @@
       rows.forEach(r => {
         const hay = r.getAttribute('data-search') || '';
         r.style.display = hay.includes(q) ? '' : 'none';
-        // divider right after row
         const div = r.nextElementSibling;
         if (div && div.classList.contains('divider')) {
           div.style.display = hay.includes(q) ? '' : 'none';
