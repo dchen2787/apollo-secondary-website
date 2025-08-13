@@ -24,6 +24,12 @@
   .alert-warning { background:#fff7ed; color:#9a3412; }
   .alert .close { position:absolute; right:10px; top:8px; background:transparent; border:0; font-size:20px; line-height:1; color:inherit; opacity:.6; }
 
+  /* Phase banner (big and obvious for PCP only) */
+  .phase-banner { border-radius:16px; padding:14px 16px; border:1px solid #dbeafe; background:#eff6ff; color:#1e3a8a; margin:12px 0; }
+  .phase-banner.p0 { background:#f3f4f6; border-color:#e5e7eb; color:#111827; }
+  .phase-banner.p1 { background:#fff1f2; border-color:#fecaca; color:#991b1b; } /* PCP only: more obvious */
+  .phase-banner p { margin:0; }
+
   /* Locked banner (permanent) */
   .lock-banner-wrap { margin:18px 0; }
   .lock-banner { border-radius:16px; padding:14px 16px; background:#fff7ed; color:#9a3412; border:1px solid #fcd49b; }
@@ -33,13 +39,13 @@
   .filter-head { font-weight:600; color:#374151; margin-bottom:10px; }
   .controls {
     display:grid;
-    grid-template-columns: minmax(280px, 520px) minmax(240px, 320px) auto;
+    grid-template-columns: minmax(280px, 520px) minmax(240px, 340px) auto;
     gap:16px;
     justify-content:center;
     align-items:center;
   }
   .searchbar { border-radius:12px; border:1px solid #e5e7eb; padding:10px 12px; width:100%; }
-  .dropdown { width:100%; }
+  .dropdown { width:100%; position:relative; }
   .dropdown .dropdown-toggle { 
     width:100%; 
     border-radius:12px; padding:10px 14px; 
@@ -77,6 +83,22 @@
 
 <div class="container">
 
+  <!-- Phase banner -->
+  <div class="phase-banner p<%= phase %>">
+    <strong><%= phaseName %></strong>
+    <p style="margin-top:4px;">
+      <% if (phase === 0) { %>
+        View-only: you can browse slots but cannot claim yet.
+      <% } else if (phase === 1) { %>
+        PCP-only: you may claim <strong>Primary Care</strong> slots only. Non‑PCP slots are temporarily unavailable.
+      <% } else if (phase === 2) { %>
+        You may claim up to <strong>2</strong> slots total this phase.
+      <% } else { %>
+        You may claim an <strong>unlimited</strong> number of slots (subject to availability).
+      <% } %>
+    </p>
+  </div>
+
   <% if (controls && controls.matchingLocked) { %>
     <div class="lock-banner-wrap">
       <div class="lock-banner">
@@ -89,12 +111,6 @@
   <% if (errM && errM.length) { %>
     <div class="alert alert-info">
       <%= errM %>
-      <button type="button" class="close" aria-label="Close">&times;</button>
-    </div>
-  <% } %>
-  <% if (controls && controls.PCPonly) { %>
-    <div class="alert alert-info">
-      PCP-only mode is ON. You can only claim primary-care slots right now.
       <button type="button" class="close" aria-label="Close">&times;</button>
     </div>
   <% } %>
@@ -119,7 +135,6 @@
     </div>
   </div>
 
-  <% /* define once, before using below */ %>
   <% const matchingLocked = !!(controls && controls.matchingLocked); %>
 
   <!-- Your Matches -->
@@ -130,7 +145,7 @@
       if (mySlots.length === 0) { %>
         <div class="muted" style="margin-bottom:12px;">You haven’t claimed any slots yet.</div>
     <% } %>
-    <% const PCPonly = !!(controls && controls.PCPonly); %>
+    <% const PCPonly = (phase === 1); %>
     <% mySlots.forEach(function(slot){
          const isPCP = ['Family Medicine (PCP)','Primary Care'].includes((slot.physSpecialty||'').trim());
     %>
@@ -138,7 +153,7 @@
         <div class="head">
           <strong><%= slot.physName || '—' %></strong>
           <% if (slot.physSpecialty) { %><span class="badge-soft"><%= slot.physSpecialty %></span><% } %>
-          <% if (PCPonly && slot.physSpecialty && !isPCP) { %><span class="pill-nonpcp">Non-PCP</span><% } %>
+          <% if (PCPonly && slot.physSpecialty && !isPCP) { %><span class="pill-nonpcp">Non‑PCP</span><% } %>
         </div>
         <div class="muted" style="margin:6px 0;">
           <strong><%= slot.dDate || '-' %></strong> • <%= (slot.timeStart || '-') %> to <%= (slot.timeEnd || '-') %> • <%= slot.location || '-' %>
@@ -160,6 +175,16 @@
         You have confirmed your slots.
       </div>
     <% } %>
+
+    <!-- Guidance text only when locked/confirm page -->
+    <% if (matchingLocked) { %>
+      <hr />
+      <p style="font-size:18px; line-height:1.4; margin:16px 0 0;">
+        To confirm that you are willing and able to attend all the slots above, press this button.
+        Please remember to check date and location information carefully. If you are unable to attend any of the slots above
+        or have any questions about your slots, instead contact the Apollo Team via email immediately.
+      </p>
+    <% } %>
   </div>
 
   <% if (!matchingLocked) { %>
@@ -177,7 +202,7 @@
           <input id="search" class="searchbar" placeholder="Search by physician, specialty, location, or notes…">
           <div class="dropdown" id="specDropdownWrap">
             <button class="dropdown-toggle" type="button" id="specDropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" role="button">
-              Specialties (multi-select)
+              Specialties (multi‑select)
             </button>
             <div class="dropdown-menu p-2" aria-labelledby="specDropdown">
               <label class="dropdown-item">
@@ -202,7 +227,13 @@
       <div id="slotList">
         <% (slots || []).forEach(function(slot){
              const isPCP2 = ['Family Medicine (PCP)','Primary Care'].includes((slot.physSpecialty||'').trim());
-             const claimDisabledReason = (controls && controls.PCPonly && !isPCP2) ? "PCP-only is active." : null;
+
+             // Compute button disable reason by phase
+             let claimDisabledReason = null;
+             if (phase === 0) claimDisabledReason = "View-only phase";
+             else if (phase === 1 && !isPCP2) claimDisabledReason = "PCP-only is active";
+             else if (phase === 2 && (currentCount >= 2)) claimDisabledReason = "Limit of 2 reached";
+
              const claimedState = slot.studentEmail ? (slot.studentEmail === user.email ? "me" : "other") : "no";
         %>
           <div class="slot-card searchable"
@@ -212,7 +243,7 @@
             <div class="head">
               <strong><%= slot.physName || '—' %></strong>
               <% if (slot.physSpecialty) { %><span class="badge-soft"><%= slot.physSpecialty %></span><% } %>
-              <% if ((controls && controls.PCPonly) && slot.physSpecialty && !isPCP2) { %><span class="pill-nonpcp">Non-PCP</span><% } %>
+              <% if ((phase === 1) && slot.physSpecialty && !isPCP2) { %><span class="pill-nonpcp">Non‑PCP</span><% } %>
             </div>
             <div class="muted" style="margin:6px 0;">
               <strong><%= slot.dDate || '-' %></strong> • <%= (slot.timeStart || '-') %> to <%= (slot.timeEnd || '-') %> • <%= slot.location || '-' %>
