@@ -182,8 +182,8 @@
     <% if (matchingLocked) { %>
       <hr />
       <p style="font-size:18px; line-height:1.4; margin:16px 0 0;">
-        To confirm that you are willing and able to attend all the slots above, press the <strong>confirm<strong> button.
-        Please remember to check date and location information carefully. If you are unable to attend any of the slots above, please <strong>remove<strong> them before confirming.
+        To confirm that you are willing and able to attend all the slots above, press the <strong>confirm</strong> button.
+        Please remember to check date and location information carefully. If you are unable to attend any of the slots above, please <strong>remove</strong> them before confirming.
         If you have any questions about your slots, contact the Apollo Team via email immediately.
       </p>
     <% } %>
@@ -342,7 +342,16 @@
     updateSpecHint(); apply();
   })();
 </script>
-
+<script>
+  // Auto-dismiss alerts after 5 seconds
+  setTimeout(() => {
+    document.querySelectorAll('.alert').forEach(el => {
+      el.style.transition = 'opacity 0.5s ease';
+      el.style.opacity = '0';
+      setTimeout(() => el.remove(), 500); // wait for fade before removing
+    });
+  }, 5000);
+</script>
 <!-- Bootstrap (needed for dropdown) -->
 <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
