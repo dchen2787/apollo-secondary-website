@@ -1,185 +1,53 @@
 <%- include("./partials/header"); -%>
-<style>
-  .admin-wrap{display:grid;grid-template-columns:220px 1fr;gap:18px}
-  @media(max-width:991px){.admin-wrap{grid-template-columns:1fr}}
-  .cardish{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px;box-shadow:0 8px 22px rgba(0,0,0,.06);margin-bottom:18px}
-  .muted{color:#6b7280}
-  .divider{height:1px;background:#e5e7eb;margin:10px 0}
-  .nav a{display:block;padding:8px 10px;border-radius:8px;color:#111}
-  .nav a:hover{background:#f7f7f7;text-decoration:none}
-  .nav .active{background:#eef2ff}
-
-  /* text wrapping helpers */
-  .nowrap { white-space: nowrap; }
-  .truncate {
-    display:inline-block; max-width:100%;
-    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; vertical-align:bottom;
-  }
-  @media (max-width: 767px){ .truncate { white-space: normal; } }
-  .col-email { min-width:220px; }
-  .col-school{ min-width:180px; }
-</style>
-
 <div class="container">
-  <% if (errM && errM.length) { %>
-    <div class="alert alert-info" style="margin:10px 0;"><%= errM %></div>
-  <% } %>
+  <a class="btn btn-link" href="/admin/students">← Back to Students</a>
 
-  <div class="admin-wrap">
-    <aside class="cardish" style="position:sticky;top:16px;align-self:start;">
-      <div class="d-flex align-items-center justify-content-between">
-        <h5 style="margin:0;">Admin</h5>
-        <!-- collapse toggle for small screens -->
-        <button class="btn btn-sm btn-light d-lg-none" type="button" data-toggle="collapse" data-target="#adminNav">Menu</button>
-      </div>
-      <div id="adminNav" class="collapse show">
-        <div class="nav" style="margin-top:8px;">
-          <a href="/admin/students" class="active">Students</a>
-          <a href="/admin/match">Match Controls</a>
-        </div>
-        <div class="divider"></div>
-        <div class="muted">Active: <%= activeCount %> • Archived: <%= archivedCount %></div>
-      </div>
-    </aside>
+  <div class="d-flex align-items-center mb-3">
+    <h1 class="h4 mb-0">
+      <%= [student.fName, student.lName].filter(Boolean).join(' ') || student.email %>
+    </h1>
+    <% if (student.archived) { %><span class="badge badge-secondary ml-2">Archived</span><% } %>
+    <span class="ml-3 text-muted"><%= student.email %></span>
+  </div>
 
-    <main>
-      <!-- Filters -->
-      <section class="cardish">
-        <form method="get" action="/admin/students" class="form-inline" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-          <input type="hidden" name="archived" value="<%= includeArchived ? 'true' : 'false' %>">
-          <label class="checkbox" style="display:flex;align-items:center;gap:6px;margin:0;">
-            <input type="checkbox" name="lyte" value="true" <%= lyteOnly ? 'checked' : '' %> />
-            <span>LYTE only</span>
-          </label>
-          <button class="btn btn-light" type="submit">Apply</button>
-          <% if (lyteOnly) { %>
-            <a class="btn btn-light" href="/admin/students?archived=<%= includeArchived ? 'true' : 'false' %>">Clear</a>
-          <% } %>
-          <span class="muted ml-auto">
-            View:
-            <% if (includeArchived) { %>
-              <a href="/admin/students?archived=false<%= lyteOnly ? '&lyte=true' : '' %>">Active</a> • <strong>Archived</strong>
-            <% } else { %>
-              <strong>Active</strong> • <a href="/admin/students?archived=true<%= lyteOnly ? '&lyte=true' : '' %>">Archived</a>
-            <% } %>
-          </span>
-        </form>
-      </section>
+  <div class="card card-body mb-3">
+    <form method="post" action="/admin/student/archive" style="display:inline;">
+      <input type="hidden" name="email" value="<%= student.email %>">
+      <input type="hidden" name="action" value="<%= student.archived ? 'unarchive' : 'archive' %>">
+      <button class="btn <%= student.archived ? 'btn-success' : 'btn-warning' %>">
+        <%= student.archived ? 'Unarchive' : 'Archive' %>
+      </button>
+    </form>
+  </div>
 
-      <!-- Student Hours -->
-      <section class="cardish">
-        <div class="d-flex align-items-center">
-          <h2 style="margin:0;font-size:20px;">Student Hours</h2>
-          <% if (lyteOnly) { %><span class="badge badge-info ml-2">LYTE filter ON</span><% } %>
-          <input id="studentSearch" class="form-control ml-auto" placeholder="Search name or email" style="max-width:260px;">
-        </div>
-
-        <div class="divider"></div>
-
-        <div class="row font-weight-bold">
-          <div class="col-12 col-md-4">Student</div>
-          <div class="col-12 col-md-3">Email</div>
-          <div class="col-12 col-md-3">School</div>
-          <div class="col-12 col-md-2">Hours</div>
-        </div>
-        <div class="divider"></div>
-
-        <div id="studentList">
-          <% (studentHours || []).forEach(function(s){ %>
-            <div class="row student-row" data-search="<%= [s.name, s.email, s.school].join(' ').toLowerCase() %>">
-              <div class="col-12 col-md-4">
-                <a class="truncate" href="/admin/student/<%= encodeURIComponent(s.email) %>"
-                   title="<%= s.name || s.email %>">
-                  <%= s.name || "(no name)" %>
-                </a>
-                <%= s.isLyte ? " • LYTE" : "" %>
-                <%= s.archived ? " • Archived" : "" %>
-              </div>
-              <div class="col-12 col-md-3 col-email">
-                <a class="truncate" href="/admin/student/<%= encodeURIComponent(s.email) %>"
-                   title="<%= s.email %>"><%= s.email %></a>
-              </div>
-              <div class="col-12 col-md-3 col-school">
-                <span class="truncate" title="<%= s.school || '(No school)' %>"><%= s.school || "(No school)" %></span>
-              </div>
-              <div class="col-12 col-md-2 nowrap"><%= s.hours.toFixed(2) %></div>
-            </div>
-            <div class="divider"></div>
+  <div class="card card-body">
+    <h5 class="mb-3">All Matches</h5>
+    <div class="table-responsive">
+      <table class="table table-sm">
+        <thead><tr>
+          <th>Date</th><th>Start</th><th>End</th><th>Physician</th><th>Specialty</th><th>Location</th><th></th>
+        </tr></thead>
+        <tbody>
+          <% (slots || []).forEach(function(s){ %>
+            <tr class="<%= s.isPast ? 'text-muted' : '' %>">
+              <td><%= s.dDate || '' %></td>
+              <td><%= s.timeStart || '' %></td>
+              <td><%= s.timeEnd || '' %></td>
+              <td><%= s.physName || '' %></td>
+              <td><%= s.physSpecialty || '' %></td>
+              <td><%= s.location || '' %></td>
+              <td class="text-right">
+                <form method="post" action="/admin/student/remove-slot" onsubmit="return confirm('Remove this slot?')" style="display:inline;">
+                  <input type="hidden" name="slotId" value="<%= s._id %>">
+                  <input type="hidden" name="email" value="<%= student.email %>">
+                  <button class="btn btn-sm btn-outline-danger">Remove</button>
+                </form>
+              </td>
+            </tr>
           <% }) %>
-        </div>
-      </section>
-
-      <!-- Hours by School -->
-      <section class="cardish">
-        <h2 style="margin:0 0 10px 0;font-size:20px;">Hours by School</h2>
-        <div class="row font-weight-bold">
-          <div class="col-12 col-md-8">School</div>
-          <div class="col-12 col-md-4">Total Hours</div>
-        </div>
-        <div class="divider"></div>
-        <% (hoursBySchool || []).forEach(function(r){ %>
-          <div class="row">
-            <div class="col-12 col-md-8"><span class="truncate" title="<%= r.school %>"><%= r.school %></span></div>
-            <div class="col-12 col-md-4 nowrap"><%= r.hours.toFixed(2) %></div>
-          </div>
-          <div class="divider"></div>
-        <% }) %>
-      </section>
-
-      <!-- Archived list -->
-      <section class="cardish">
-        <h2 style="margin:0 0 10px 0;font-size:20px;">Archived Students</h2>
-        <p class="muted" style="margin-top:-6px;">These users cannot log in, but their history remains.</p>
-        <div class="row font-weight-bold">
-          <div class="col-12 col-md-4">Student</div>
-          <div class="col-12 col-md-4">Email</div>
-          <div class="col-12 col-md-4">Actions</div>
-        </div>
-        <div class="divider"></div>
-        <% (archivedStudents || []).forEach(function(st){ %>
-          <div class="row">
-            <div class="col-12 col-md-4">
-              <a class="truncate" href="/admin/student/<%= encodeURIComponent(st.email) %>"
-                 title="<%= [st.fName, st.lName].filter(Boolean).join(' ') || st.email %>">
-                <%= [st.fName, st.lName].filter(Boolean).join(' ') || '(no name)' %>
-              </a>
-            </div>
-            <div class="col-12 col-md-4 col-email">
-              <a class="truncate" href="/admin/student/<%= encodeURIComponent(st.email) %>"
-                 title="<%= st.email %>"><%= st.email %></a>
-            </div>
-            <div class="col-12 col-md-4">
-              <form action="/admin/student/archive" method="post" style="display:inline;">
-                <input type="hidden" name="email" value="<%= st.email %>">
-                <input type="hidden" name="action" value="unarchive">
-                <button class="btn btn-success btn-sm" onclick="return confirm('Unarchive <%= st.email %>?')">
-                  Unarchive
-                </button>
-              </form>
-            </div>
-          </div>
-          <div class="divider"></div>
-        <% }) %>
-      </section>
-    </main>
+        </tbody>
+      </table>
+    </div>
   </div>
 </div>
-
-<script>
-  const studentSearch = document.getElementById('studentSearch');
-  if (studentSearch) {
-    const rows = Array.from(document.querySelectorAll('.student-row'));
-    const apply = () => {
-      const q = (studentSearch.value || '').toLowerCase().trim();
-      rows.forEach(r => {
-        const hay = r.getAttribute('data-search') || '';
-        const show = hay.includes(q);
-        r.style.display = show ? '' : 'none';
-        const div = r.nextElementSibling;
-        if (div && div.classList.contains('divider')) div.style.display = show ? '' : 'none';
-      });
-    };
-    studentSearch.addEventListener('input', apply);
-  }
-</script>
 <%- include("./partials/footer"); -%>
