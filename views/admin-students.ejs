@@ -87,15 +87,15 @@
         
         <div id="studentList">
           <% (studentHours || []).forEach(function(s){ %>
-            <div class="student-row" data-search="<%= [s.name, s.email, s.school].join(' ').toLowerCase() %>">
-              <div>
+            <div class="row student-row" data-search="<%= [s.name, s.email, s.school].join(' ').toLowerCase() %>">
+              <div class="col-12 col-md-4">
                 <a href="/admin/student/<%= encodeURIComponent(s.email) %>"><%= s.name || "(no name)" %></a>
                 <%= s.isLyte ? " • LYTE" : "" %>
                 <%= s.archived ? " • Archived" : "" %>
               </div>
-              <div><a href="/admin/student/<%= encodeURIComponent(s.email) %>"><%= s.email %></a></div>
-              <div><%= s.school || "(No school)" %></div>
-              <div><%= s.hours.toFixed(2) %></div>
+              <div class="col-12 col-md-3"><a href="/admin/student/<%= encodeURIComponent(s.email) %>"><%= s.email %></a></div>
+              <div class="col-12 col-md-3"><%= s.school || "(No school)" %></div>
+              <div class="col-12 col-md-2"><%= s.hours.toFixed(2) %></div>
             </div>
             <div class="divider"></div>
           <% }) %>
