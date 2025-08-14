@@ -495,6 +495,17 @@ app.get("/activate-account", function(req,res){
   res.render("activate-account", {errM:"", errM2:""});
 });
 
+app.get("/admin/match", async (req,res) => {
+  try {
+    const ctrl = await Control.findOne({ id:1 }).lean();
+    const confirms = await Confirm.find({}).lean();
+    // Add any other data you want in the controls page
+    res.render("admin-match", { errM:"", controls: ctrl, confirms });
+  } catch (e) {
+    res.render("admin-match", { errM: "Failed to load controls.", controls: null, confirms: [] });
+  }
+});
+
 // IMPORTANT: keep this wildcard AT THE VERY END of all routes
 app.get('*', function(req, res) {
   res.redirect('/');
