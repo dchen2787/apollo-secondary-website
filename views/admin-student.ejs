@@ -133,19 +133,38 @@
 
 <script>
   const studentSearch = document.getElementById('studentSearch');
-  if (studentSearch) {
-    const rows = Array.from(document.querySelectorAll('.student-row'));
-    const apply = () => {
-      const q = (studentSearch.value || '').toLowerCase().trim();
-      rows.forEach(r => {
-        const hay = r.getAttribute('data-search') || '';
-        const show = hay.includes(q);
-        r.style.display = show ? '' : 'none';
-        const div = r.nextElementSibling;
-        if (div && div.classList.contains('divider')) div.style.display = show ? '' : 'none';
-      });
-    };
-    studentSearch.addEventListener('input', apply);
+  const rows = Array.from(document.querySelectorAll('.student-row'));
+
+  function applyFilter() {
+    const q = (studentSearch?.value || '').toLowerCase().trim();
+    let visible = 0;
+
+    rows.forEach(r => {
+      const hay = r.getAttribute('data-search') || '';
+      const show = hay.includes(q);
+      r.style.display = show ? '' : 'none';
+      const divider = r.nextElementSibling;
+      if (divider && divider.classList.contains('divider')) {
+        divider.style.display = show ? '' : 'none';
+      }
+      if (show) visible++;
+    });
+
+    let empty = document.getElementById('noMatches');
+    if (!empty) {
+      empty = document.createElement('div');
+      empty.id = 'noMatches';
+      empty.className = 'muted';
+      empty.style.margin = '8px 0';
+      empty.textContent = 'No students match your search.';
+      document.getElementById('studentList')?.appendChild(empty);
+    }
+    empty.style.display = visible ? 'none' : '';
   }
+
+  if (studentSearch) {
+    studentSearch.addEventListener('input', applyFilter);
+  }
+  // apply once on load
+  applyFilter();
 </script>
-<%- include("./partials/footer"); -%>
