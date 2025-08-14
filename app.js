@@ -1,4 +1,8 @@
 // app.js
+const path = require('path');
+
+app.set('views', path.join(__dirname, 'views')); // make sure express knows where to look
+
 const express    = require('express');
 const ejs        = require('ejs');
 const bodyParser = require('body-parser');
@@ -626,8 +630,7 @@ app.post("/admin-newAccounts", function(req,res){
       });
     }
   });
-
-  return renderAdminHome(res, "Accounts processed.");
+  return renderAdminStudents(res, "Accounts processed.");
 });
 
 // Claim slot — ENFORCE PHASE RULES + MAX SLOTS
@@ -746,8 +749,7 @@ app.post("/admin-matchSettings", async function(req, res) {
 
     // propagate "matchingLocked" per-student display flag (legacy behavior)
     await Student.updateMany({}, { matchingLocked: lockValue });
-
-    return renderAdminHome(res, "Match settings updated.");
+    return renderAdminMatch(res, "All confirmations cleared.");
   } catch (err) {
     console.error("Error updating Control:", err);
     return renderAdminHome(res, "Error updating match settings.");
@@ -770,7 +772,7 @@ app.post("/admin-clear-confirm", async function(req, res) {
     const email = _.toLower(req.body.email || "");
     if (!email) return renderAdminHome(res, "No email provided.");
     await Confirm.updateOne({ email }, { $unset: { confirmed: "" } }, { upsert: false });
-    return renderAdminHome(res, `Confirmation cleared for ${email}.`);
+    return renderAdminMatch(res, `Confirmation cleared for ${email}.`);
   } catch (err) {
     return errorPage(res, err);
   }
@@ -905,7 +907,7 @@ app.post("/admin/student/archive", async function(req, res) {
     if (req.get("referer") && req.get("referer").includes(`/admin/student/`)) {
       return res.redirect(`/admin/student/${encodeURIComponent(email)}`);
     }
-    return renderAdminHome(res, archived ? "Student archived." : "Student unarchived.");
+    return renderAdminStudents(res, archived ? "Student archived." : "Student unarchived.");
   } catch (e) {
     return errorPage(res, e);
   }
