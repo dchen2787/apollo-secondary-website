@@ -1,46 +1,79 @@
 <%- include("./partials/header"); -%>
 <div class="container">
-  <% if (errM) { %><div class="alert alert-info"><%= errM %></div><% } %>
+  <% if (errM && errM.length) { %>
+    <div class="alert alert-info" style="margin:10px 0;"><%= errM %></div>
+  <% } %>
 
-  <div class="admin-wrap">
-    <aside class="cardish" style="position:sticky;top:16px;align-self:start;">
-      <h5 style="margin:0 0 8px 0;">Admin</h5>
-      <div class="nav">
-        <a href="/admin/students">Students</a>
-        <a href="/admin/match" class="active">Match Controls</a>
+  <div class="d-flex align-items-center mb-3">
+    <h1 class="h4 mb-0">Match Controls</h1>
+    <a class="btn btn-link ml-auto" href="/admin/students">← Students</a>
+  </div>
+
+  <!-- Controls form -->
+  <div class="card card-body mb-3">
+    <form method="post" action="/admin-matchSettings">
+      <div class="form-row">
+        <div class="form-group col-md-4">
+          <label>Phase</label>
+          <select class="form-control" name="phase">
+            <option value="0" <%= controls?.phase===0?'selected':'' %>>0 — View Only</option>
+            <option value="1" <%= controls?.phase===1?'selected':'' %>>1 — PCP Only</option>
+            <option value="2" <%= controls?.phase===2?'selected':'' %>>2 — Max 2</option>
+            <option value="3" <%= controls?.phase===3?'selected':'' %>>3 — Unlimited</option>
+          </select>
+        </div>
+        <div class="form-group col-md-4">
+          <label>Lock matching</label>
+          <select class="form-control" name="matchingLock">
+            <option value="false" <%= controls?.matchingLocked ? '' : 'selected' %>>Unlocked</option>
+            <option value="true"  <%= controls?.matchingLocked ? 'selected' : '' %>>Locked</option>
+          </select>
+        </div>
+        <div class="form-group col-md-4">
+          <label>Max slots (informational)</label>
+          <input class="form-control" type="number" name="maxSlots" value="<%= maxSlots %>" />
+        </div>
       </div>
-    </aside>
+      <button class="btn btn-primary">Save</button>
+    </form>
+  </div>
 
-    <main>
-      <section class="cardish" style="display:flex;align-items:center;gap:10px">
-        <h2 style="margin:0;font-size:20px;">Match Controls</h2>
-      </section>
+  <!-- Confirmation tools -->
+  <div class="card card-body mb-3">
+    <h5>Confirmations</h5>
+    <form method="post" action="/admin-reset-confirms" onsubmit="return confirm('Clear ALL confirmations?')">
+      <button class="btn btn-outline-danger btn-sm">Reset All Confirms</button>
+    </form>
+    <form class="form-inline mt-2" method="post" action="/admin-clear-confirm">
+      <input class="form-control mr-2" name="email" placeholder="student@email" required>
+      <button class="btn btn-outline-secondary btn-sm">Clear One</button>
+    </form>
+  </div>
 
-      <!-- In-page nav -->
-      <nav class="cardish" style="display:flex;gap:10px;flex-wrap:wrap">
-        <a class="btn btn-light btn-sm" href="#phase-lock">Phase & Lock</a>
-        <a class="btn btn-light btn-sm" href="#confirm-controls">Confirm Controls</a>
-        <a class="btn btn-light btn-sm" href="#shadow-slots">Shadow Slots</a>
-      </nav>
-
-      <section id="phase-lock" class="cardish">
-        <h3 style="margin-top:0">Phase & Lock</h3>
-        <!-- Your form for /admin-matchSettings (phase + lock). Remove any "matching allowed for ..." text here -->
-        <!-- ... -->
-      </section>
-
-      <section id="confirm-controls" class="cardish">
-        <h3 style="margin-top:0">Confirm Controls</h3>
-        <!-- buttons: reset all, clear one, etc. -->
-        <!-- ... -->
-      </section>
-
-      <section id="shadow-slots" class="cardish">
-        <h3 style="margin-top:0">Shadow Slots</h3>
-        <!-- slot importing / managing UI -->
-        <!-- ... -->
-      </section>
-    </main>
+  <!-- Shadow slots table (read-only list for now) -->
+  <div class="card card-body">
+    <h5>All Slots (read-only)</h5>
+    <div class="table-responsive">
+      <table class="table table-sm">
+        <thead><tr>
+          <th>Physician</th><th>Specialty</th><th>Date</th><th>Start</th><th>End</th><th>Location</th><th>Student</th><th>Email</th>
+        </tr></thead>
+        <tbody>
+          <% (slots || []).forEach(function(s){ %>
+            <tr>
+              <td><%= s.physName || '' %></td>
+              <td><%= s.physSpecialty || '' %></td>
+              <td><%= s.dDate || '' %></td>
+              <td><%= s.timeStart || '' %></td>
+              <td><%= s.timeEnd || '' %></td>
+              <td><%= s.location || '' %></td>
+              <td><%= s.studentName || '' %></td>
+              <td><%= s.studentEmail || '' %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
   </div>
 </div>
 <%- include("./partials/footer"); -%>
