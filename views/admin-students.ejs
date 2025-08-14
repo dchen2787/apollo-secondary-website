@@ -8,6 +8,23 @@
   .nav a{display:block;padding:8px 10px;border-radius:8px;color:#111}
   .nav a:hover{background:#f7f7f7;text-decoration:none}
   .nav .active{background:#eef2ff}
+
+  .row-head, .student-row {
+    display: grid;
+    grid-template-columns: 1.5fr 2fr 1.5fr .8fr; /* name, email, school, hours */
+    gap: 10px;
+    align-items: center;
+  }
+  .student-row > div, .row-head > div {
+    overflow-wrap: anywhere; /* prevent overlap */
+    word-break: break-word;
+  }
+  
+  @media(max-width: 991px){
+    .row-head, .student-row {
+      grid-template-columns: 1fr 1fr; /* stack on small screens */
+    }
+  }
 </style>
 
 <div class="container">
@@ -61,24 +78,24 @@
         <div class="divider"></div>
 
         <div class="row row-head" style="font-weight:700;">
-          <div class="col-12 col-md-4">Student</div>
-          <div class="col-12 col-md-3">Email</div>
-          <div class="col-12 col-md-3">School</div>
-          <div class="col-12 col-md-2">Hours</div>
+          <div>Student</div>
+          <div>Email</div>
+          <div>School</div>
+          <div>Hours</div>
         </div>
         <div class="divider"></div>
-
+        
         <div id="studentList">
           <% (studentHours || []).forEach(function(s){ %>
-            <div class="row student-row" data-search="<%= [s.name, s.email, s.school].join(' ').toLowerCase() %>">
-              <div class="col-12 col-md-4">
+            <div class="student-row" data-search="<%= [s.name, s.email, s.school].join(' ').toLowerCase() %>">
+              <div>
                 <a href="/admin/student/<%= encodeURIComponent(s.email) %>"><%= s.name || "(no name)" %></a>
                 <%= s.isLyte ? " • LYTE" : "" %>
                 <%= s.archived ? " • Archived" : "" %>
               </div>
-              <div class="col-12 col-md-3"><a href="/admin/student/<%= encodeURIComponent(s.email) %>"><%= s.email %></a></div>
-              <div class="col-12 col-md-3"><%= s.school || "(No school)" %></div>
-              <div class="col-12 col-md-2"><%= s.hours.toFixed(2) %></div>
+              <div><a href="/admin/student/<%= encodeURIComponent(s.email) %>"><%= s.email %></a></div>
+              <div><%= s.school || "(No school)" %></div>
+              <div><%= s.hours.toFixed(2) %></div>
             </div>
             <div class="divider"></div>
           <% }) %>
