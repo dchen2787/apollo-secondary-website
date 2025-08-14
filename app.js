@@ -799,6 +799,44 @@ app.get("/admin/student/:email", async function(req, res) {
   }
 });
 
+// Single place to render "home" with correct phase & counts
+async function renderHome(res, userEmail, errM = "") {
+  try {
+    const [foundUser, slotsRaw, ctrl, confirmDoc, myCount] = await Promise.all([
+      userEmail ? Student.findOne({ email: userEmail }).lean() : null,
+      Slot.find({}).lean(),
+      Control.findOne({ id: 1 }).lean(),
+      userEmail ? Confirm.findOne({ email: userEmail }).lean() : null,
+      userEmail ? Slot.countDocuments({ studentEmail: (userEmail || "").toLowerCase() }) : Promise.resolve(0)
+    ]);
+
+    // hide admin-only slots from the student's view (when assigned to that student)
+    const visibleSlotsRaw = (slotsRaw || []).filter(
+      s => !(s.adminOnly && (s.studentEmail || "").toLowerCase() === (userEmail || "").toLowerCase())
+    );
+
+    const slots = setDisplayValues(visibleSlotsRaw);
+    const confirmed = !!(confirmDoc && confirmDoc.confirmed);
+    const phaseVal  = ctrl?.phase ?? 3;
+
+    res.render("home", {
+      user: foundUser,
+      slots,
+      controls: ctrl,
+      phase: phaseVal,
+      phaseName: phaseName(phaseVal),
+      maxSlots: effectiveMaxSlots(ctrl), // 0 means unlimited
+      currentCount: myCount,
+      errM,
+      confirmed,
+      isConfirmed: confirmed
+    });
+  } catch (e) {
+    console.error(e);
+    return errorPage(res, e);
+  }
+}
+
 // Admin: remove a single slot (unclaim)
 app.post("/admin/student/remove-slot", async function(req, res) {
   try {
