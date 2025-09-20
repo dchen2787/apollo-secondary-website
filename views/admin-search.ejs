@@ -117,6 +117,22 @@
       <% }) %>
     </div>
 
+    <div class="muted">
+      <b><%= s.totalHours.toFixed(2) %> hrs</b> • <b><%= s.totalSlots %></b> slot(s)
+      <div style="margin-top:6px;">
+        <% if (s.isArchived) { %>
+          <form action="/admin/students/<%= encodeURIComponent(s.email) %>/unarchive" method="post" style="display:inline;">
+            <button class="btn btn-sm btn-outline-primary">Unarchive</button>
+          </form>
+        <% } else { %>
+          <form action="/admin/students/<%= encodeURIComponent(s.email) %>/archive" method="post" style="display:inline;">
+            <button class="btn btn-sm btn-outline-danger">Archive</button>
+          </form>
+        <% } %>
+      </div>
+    </div>
+
+
     <!-- Physicians -->
     <div class="section" style="margin-top:28px;">
       <h2>Physician matches (<%= physicianGroups.length %>)</h2>
