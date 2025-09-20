@@ -315,18 +315,23 @@ async function renderAdminHome(res, flashMsg = "", lyteOnly = false) {
       Control.findOne({ id: 1 }).lean(),
       Student.find({}).lean()
     ]);
-    const array = setDisplayValues(slots);
 
-    const { studentHours, hoursBySchool } = buildAdminAnalytics(slots, students, lyteOnly);
+    // NEW: split
+    const activeStudents   = students.filter(s => !s.isArchived);
+    const archivedStudents = students.filter(s =>  s.isArchived);
+
+    const { studentHours: activeHours,   hoursBySchool } = buildAdminAnalytics(slots, activeStudents, lyteOnly);
+    const { studentHours: archivedHours }                = buildAdminAnalytics(slots, archivedStudents, lyteOnly);
 
     res.render("admin-home", {
-      slots: array,
+      slots: setDisplayValues(slots),
       controls: ctrl,
       maxSlots: effectiveMaxSlots(ctrl),
       allGroups: allGroups.sort(),
       confirms,
       errM: flashMsg || "",
-      studentHours,
+      studentHours: activeHours,     // default section = Active
+      archivedStudentHours: archivedHours, // NEW
       hoursBySchool,
       lyteOnly
     });
@@ -334,6 +339,7 @@ async function renderAdminHome(res, flashMsg = "", lyteOnly = false) {
     return errorPage(res, e);
   }
 }
+
 
 // ---- CSV helpers ----
 function csvEscape(val) {
