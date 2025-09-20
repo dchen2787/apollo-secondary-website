@@ -85,6 +85,18 @@
             </div>
             <div class="muted">
               <b><%= s.totalHours.toFixed(2) %> hrs</b> • <b><%= s.totalSlots %></b> slot(s)
+              <!-- ✅ Archive/Unarchive buttons (ADD THIS) -->
+                  <div style="margin-top:6px;">
+                    <% if (s.isArchived) { %>
+                      <form action="/admin/students/<%= encodeURIComponent(s.email) %>/unarchive" method="post" style="display:inline;">
+                        <button class="btn" style="padding:6px 10px;">Unarchive</button>
+                      </form>
+                    <% } else { %>
+                      <form action="/admin/students/<%= encodeURIComponent(s.email) %>/archive" method="post" style="display:inline;">
+                        <button class="btn" style="padding:6px 10px; background:#b91c1c;">Archive</button>
+                      </form>
+                    <% } %>
+                  </div>
             </div>
           </div>
 
@@ -115,21 +127,6 @@
           <% } %>
         </div>
       <% }) %>
-    </div>
-
-    <div class="muted">
-      <b><%= s.totalHours.toFixed(2) %> hrs</b> • <b><%= s.totalSlots %></b> slot(s)
-      <div style="margin-top:6px;">
-        <% if (s.isArchived) { %>
-          <form action="/admin/students/<%= encodeURIComponent(s.email) %>/unarchive" method="post" style="display:inline;">
-            <button class="btn btn-sm btn-outline-primary">Unarchive</button>
-          </form>
-        <% } else { %>
-          <form action="/admin/students/<%= encodeURIComponent(s.email) %>/archive" method="post" style="display:inline;">
-            <button class="btn btn-sm btn-outline-danger">Archive</button>
-          </form>
-        <% } %>
-      </div>
     </div>
 
 
