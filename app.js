@@ -883,6 +883,40 @@ app.post("/admin/students/:email/unarchive", async function(req, res){
 let port = process.env.PORT;
 if(!port) port = 3000;
 
+//remove dupes. note this does not clean up mongodb. for next time... :)
+async function dedupeCollection(Model, collectionName) {
+  const docs = await Model.find({}).lean();
+  const seen = new Set();
+  const removeIds = [];
+
+  docs.forEach(d => {
+    const email = (d.email || "").toLowerCase().trim();
+    if (!email) return;
+    if (seen.has(email)) {
+      removeIds.push(d._id);   // mark as duplicate
+    } else {
+      seen.add(email);
+    }
+  });
+
+  if (removeIds.length) {
+    console.log(`Removing ${removeIds.length} duplicates from ${collectionName}`);
+    await Model.deleteMany({ _id: { $in: removeIds } });
+  } else {
+    console.log(`No duplicates found in ${collectionName}`);
+  }
+}
+//run cleanup at startup
+(async () => {
+  try {
+    await dedupeCollection(Student, "students");
+    await dedupeCollection(Confirm, "confirms");
+  } catch (err) {
+    console.error("Dedupe error:", err);
+  }
+})();
+
+
 app.listen(port, function() {
   console.log("Server started!");
 });
