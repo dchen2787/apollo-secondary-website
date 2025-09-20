@@ -358,6 +358,11 @@ app.get("/admin/export/students.csv", async function(req, res) {
     if (req.query.lyte === "1") filter.isLyte = true;
     if (req.query.school && req.query.school.trim()) filter.school = req.query.school.trim();
 
+    // NEW: exclude archived unless explicitly requested
+    if (req.query.includeArchived !== "1") {
+      filter.isArchived = { $ne: true };
+    }
+  
     const [students, slots] = await Promise.all([
       Student.find(filter).lean(),
       Slot.find({}).lean()
