@@ -463,8 +463,125 @@ app.get("/activate-account", function(req,res){
   res.render("activate-account", {errM:"", errM2:""});
 });
 
-// Rich admin search page (unchanged from your current — left out here for brevity)
-// If you still want it, keep your existing /admin/search handler above this catch-all:
+
+
+
+// --- Admin Search ---
+app.get("/admin/search", async function(req, res) {
+  try {
+    const q = (req.query.q || "").trim();
+    const query = q.toLowerCase();
+
+    // counts for the header
+    const [totalStudents, totalSlots] = await Promise.all([
+      Student.countDocuments({}),
+      Slot.countDocuments({})
+    ]);
+
+    if (!query) {
+      return res.render("admin-search", {
+        query: "",
+        totalStudents,
+        totalSlots,
+        studentResults: [],
+        physicianGroups: []
+      });
+    }
+
+    // --- Student search ---
+    // Match on name or email
+    const nameRx = new RegExp(_.escapeRegExp(query), "i");
+    const students = await Student.find({
+      $or: [
+        { email: nameRx },
+        { fName: nameRx },
+        { lName: nameRx }
+      ]
+    }).lean();
+
+    // For each student, gather claimed slots + hours + status
+    const byEmail = new Map();
+    const slots = await Slot.find({}).lean();
+    slots.forEach(s => {
+      const em = (s.studentEmail || "").toLowerCase();
+      if (!em) return;
+      if (!byEmail.has(em)) byEmail.set(em, []);
+      byEmail.get(em).push(s);
+    });
+
+    // confirmations map
+    const confirms = await Confirm.find({}).lean();
+    const confirmedMap = new Map(confirms.map(c => [c.email.toLowerCase(), !!c.confirmed]));
+
+    const studentResults = students.map(st => {
+      const email = (st.email || "").toLowerCase();
+      const my = byEmail.get(email) || [];
+      const totalHours = my.reduce((sum, s) => {
+        const start = (s.timeStart || "").trim();
+        const end   = (s.timeEnd || "").trim();
+        // reuse your slotHours logic if available; otherwise quick calc fallback:
+        const parse = t => {
+          if (!t) return 0;
+          const m = /(\d+):(\d+)\s*(AM|PM)/i.exec(t);
+          if (!m) return 0;
+          let hh = parseInt(m[1],10) % 12;
+          const mm = parseInt(m[2],10);
+          if (m[3].toUpperCase() === "PM") hh += 12;
+          return hh + mm/60;
+        };
+        const hrs = Math.max(0, parse(end) - parse(start));
+        return sum + hrs;
+      }, 0);
+
+      return {
+        name: [st.fName, st.lName].filter(Boolean).join(" ") || st.email,
+        email: st.email,
+        group: st.group,
+        school: st.school,
+        isLyte: !!st.isLyte,
+        confirmed: !!confirmedMap.get(email),
+        matchingLocked: !!st.matchingLocked,
+        isArchived: !!st.isArchived,            // will render Archive/Unarchive buttons
+        totalSlots: my.length,
+        totalHours,
+        slots: my
+      };
+    });
+
+    // --- Physician/slot search ---
+    const physMatches = slots.filter(s => {
+      const hay = [
+        s.physName, s.physSpecialty, s.location,
+        s.notes, s.dDate, s.timeStart, s.timeEnd
+      ].filter(Boolean).join(" ").toLowerCase();
+      return hay.includes(query);
+    });
+
+    // group by physician for display
+    const byPhys = new Map();
+    physMatches.forEach(s => {
+      const key = (s.physName || "—") + "||" + (s.physSpecialty || "");
+      if (!byPhys.has(key)) byPhys.set(key, []);
+      byPhys.get(key).push(s);
+    });
+
+    const physicianGroups = Array.from(byPhys.entries()).map(([key, arr]) => {
+      const [physName, physSpecialty] = key.split("||");
+      return { physName, physSpecialty, slots: arr };
+    });
+
+    return res.render("admin-search", {
+      query: q,
+      totalStudents,
+      totalSlots,
+      studentResults,
+      physicianGroups
+    });
+  } catch (e) {
+    return errorPage(res, e);
+  }
+});
+
 app.get('*', function(req, res) {
   res.redirect('/');
 });
