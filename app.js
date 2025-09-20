@@ -860,11 +860,12 @@ app.post("/admin/students/:email/archive", async function(req, res){
       { email },
       { $set: { isArchived: true, archivedAt: new Date() } }
     );
-    return renderAdminHome(res, `Archived ${email}.`);
+
+    // send admin back to where they came from
+    res.redirect(req.get("Referer") || "/admin");
   } catch (e) { return errorPage(res, e); }
 });
 
-// Unarchive a student (re-enable account + move back to Active)
 app.post("/admin/students/:email/unarchive", async function(req, res){
   try {
     const email = _.toLower(req.params.email);
@@ -872,9 +873,12 @@ app.post("/admin/students/:email/unarchive", async function(req, res){
       { email },
       { $set: { isArchived: false, archivedAt: null } }
     );
-    return renderAdminHome(res, `Unarchived ${email}.`);
+
+    res.redirect(req.get("Referer") || "/admin");
   } catch (e) { return errorPage(res, e); }
 });
+
+
 // ---- Server ----
 let port = process.env.PORT;
 if(!port) port = 3000;
