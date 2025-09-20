@@ -49,10 +49,14 @@ const Slot = mongoose.model("Slot", slotSchema);
 const studentSchema = new mongoose.Schema({
   fName:String, lName:String, password:String, email:String, appId:String,
   group:String, matchingLocked: Boolean,
-  // NEW fields for admin analytics/filters
   isLyte: { type: Boolean, default: false },
-  school: { type: String, default: "" }
+  school: { type: String, default: "" },
+
+  // NEW
+  isArchived: { type: Boolean, default: false },
+  archivedAt: { type: Date, default: null }
 });
+
 const Student = mongoose.model("Student", studentSchema);
 
 const confirmSchema = new mongoose.Schema({
@@ -506,6 +510,11 @@ app.post("/login", function(req,res){
       return res.render("login", {errM:"", errM2:"Account not activated. Please activate your account (https://the-match-apolloyim-2f158c0ae122.herokuapp.com/activate-account) or contact apolloyimde@gmail.com."});
     }
 
+    // NEW — archived users cannot sign in
+    if (foundUser.isArchived) {
+      return res.render("login", {errM:"", errM2:"This account has been archived. Please contact apolloyimde@gmail.com if you need access."});
+    }
+
     bcrypt.compare(password, foundUser.password, async function(err, ok){
       if(err || !ok) return res.render("login", {errM:"", errM2:"Username or password was incorrect."});
       return renderHome(res, foundUser.email, "");
@@ -715,6 +724,29 @@ app.post("/admin-clear-confirm", async function(req, res) {
   }
 });
 
+// Archive a student (disable account + move to Archived list)
+app.post("/admin/students/:email/archive", async function(req, res){
+  try {
+    const email = _.toLower(req.params.email);
+    await Student.updateOne(
+      { email },
+      { $set: { isArchived: true, archivedAt: new Date() } }
+    );
+    return renderAdminHome(res, `Archived ${email}.`);
+  } catch (e) { return errorPage(res, e); }
+});
+
+// Unarchive a student (re-enable account + move back to Active)
+app.post("/admin/students/:email/unarchive", async function(req, res){
+  try {
+    const email = _.toLower(req.params.email);
+    await Student.updateOne(
+      { email },
+      { $set: { isArchived: false, archivedAt: null } }
+    );
+    return renderAdminHome(res, `Unarchived ${email}.`);
+  } catch (e) { return errorPage(res, e); }
+});
 // ---- Server ----
 let port = process.env.PORT;
 if(!port) port = 3000;
