@@ -664,6 +664,59 @@ app.post("/admin/students/:email/reset-confirm", async function(req, res) {
   } catch (e) { return errorPage(res, e); }
 });
 
+
+// Search open slots (AJAX) — returns JSON list of open slots matching q
+app.get("/admin/students/:email/open-slots", async function(req, res) {
+  try {
+    const q = String(req.query.q || "").toLowerCase().trim();
+    const open = await Slot.find({
+      $or: [{ studentEmail: { $exists: false } }, { studentEmail: "" }, { studentEmail: null }]
+    }).lean();
+
+    // basic text match across common fields
+    const filtered = open.filter(sl => {
+      if (!q) return true; // if query empty, show all opens
+      const hay = [
+        sl.physName, sl.physSpecialty, sl.location, sl.notes,
+        sl.dDate, sl.timeStart, sl.timeEnd
+      ].filter(Boolean).join(" ").toLowerCase();
+      return hay.includes(q);
+    });
+
+    // return the first 50 to keep it snappy
+    res.json({ ok: true, results: filtered.slice(0, 50) });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e?.message || String(e) });
+  }
+});
+// Create a new slot and assign it to this student
+app.post("/admin/students/:email/create-slot", async function(req, res) {
+  try {
+    const email = _.toLower(req.params.email);
+    const st = await Student.findOne({ email }).lean();
+    if (!st) return errorPage(res, "Student not found");
+
+    // Build the new slot
+    const date = req.body.date ? new Date(req.body.date) : null; // yyyy-mm-dd
+    const newSlot = await Slot.create({
+      physName: (req.body.physName || "").trim(),
+      physSpecialty: (req.body.physSpecialty || "").trim(),
+      date,
+      timeStart: (req.body.timeStart || "").trim(),
+      timeEnd: (req.body.timeEnd || "").trim(),
+      location: (req.body.location || "").trim(),
+      notes: (req.body.notes || "").trim(),
+      studentEmail: email,
+      studentName: [st.fName, st.lName].filter(Boolean).join(" ")
+    });
+
+    // optional: log it
+    makeLog("Admin add slot", email, String(newSlot._id), String(newSlot._id));
+
+    res.redirect(req.get("Referer") || ("/admin/students/" + encodeURIComponent(email)));
+  } catch (e) { return errorPage(res, e); }
+});
+
 app.get('*', function(req, res) {
   res.redirect('/');
 });
