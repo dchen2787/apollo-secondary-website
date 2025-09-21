@@ -595,7 +595,7 @@ app.get("/admin/students/:email", async function(req, res) {
     // group slots: claimed by this student vs open
     const claimed = slots.filter(s => (s.studentEmail||"").toLowerCase() === email);
     const open    = slots.filter(s => !s.studentEmail);
-    res.render("admin-student.ejs", {
+    res.render("admin-student", {
       s: st,
       claimed,
       open,
