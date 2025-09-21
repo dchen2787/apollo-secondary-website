@@ -75,13 +75,12 @@
       <a class="nav-link" href="#sec-match">Match Settings <span>➜</span></a>
       <a class="nav-link" href="#sec-confirms">Confirm Controls <span>➜</span></a>
       <a class="nav-link" href="#sec-slots">Shadow Slots <span>➜</span></a>
-
     </nav>
 
     <!-- Main Content -->
     <div class="admin-main">
 
-      <!-- quick search (unchanged) -->
+      <!-- quick search -->
       <form action="/admin/search" method="get" class="form-inline" style="margin: 8px 0;">
         <input class="form-control" type="text" name="q" placeholder="Search students or physicians">
         <button class="btn" type="submit" style="margin-left:8px;">Search</button>
@@ -127,7 +126,6 @@
             <a class="btn" href="/admin/export/students.csv">Download Students CSV (All)</a>
             <a class="btn" href="/admin/export/students.csv?lyte=1">Download Students CSV (LYTE only)</a>
             <a class="btn" href="/admin/export/slots.csv">Download Slots CSV</a>
-            <a class="btn" href="/admin/export/students.csv?includeArchived=1">Download Students CSV (Include Archived)</a>
           </div>
 
           <form action="/admin/export/students.csv" method="get" class="form-inline" style="margin: 8px 0;">
@@ -235,6 +233,15 @@
               </label>
             </div>
 
+            <div style="margin-top:12px;">
+              <label>Matching allowed for (Year/session joined, grad year)</label><br/>
+              <% for (let i = 0; i < allGroups.length; i++) { %>
+                <% var boxStatus = allGroups[i][1] ? "checked" : ""; %>
+                <input type="checkbox" name="<%= allGroups[i][0] %>" <%= boxStatus %>>
+                <%= allGroups[i][0] %><br/>
+              <% } %>
+            </div>
+
             <button type="submit" class="btn" style="margin-top:12px;">Update Access</button>
           </form>
         </div>
@@ -253,19 +260,32 @@
             <button type="submit" class="btn btn-danger">Reset All Confirmations (only at end of session)</button>
           </form>
 
-          <h5>Confirm Status</h5>
+          <!-- NEW: search just this table -->
+          <div class="form-inline" style="margin-bottom:12px;">
+            <input id="confirmSearch" class="form-control" type="text"
+                   placeholder="Search by email…" style="max-width:280px;">
+          </div>
+
+          <div class="row row-head">
+            <div class="col col-5">Email</div>
+            <div class="col col-3">Status</div>
+            <div class="col col-4">Controls</div>
+          </div>
+          <div class="divider"></div>
+
           <% (confirms || []).forEach(function(confirm){ %>
-            <div class="row" style="align-items:center;">
+            <div class="row confirm-row">
               <div class="col col-5"><%= confirm.email %></div>
               <div class="col col-3">
                 <%= confirm.confirmed ? "true" : (typeof confirm.confirmed === "undefined" ? "-" : "false") %>
               </div>
               <div class="col col-4">
+                <!-- Reset confirmation for this student -->
                 <form action="/admin-clear-confirm" method="post" style="display:inline;">
                   <input type="hidden" name="email" value="<%= confirm.email %>">
                   <button type="submit" class="btn btn-light"
                           onclick="return confirm('Clear confirmation for <%= confirm.email %>?');">
-                    Clear
+                    Reset
                   </button>
                 </form>
               </div>
@@ -370,6 +390,24 @@
       });
     };
     studentSearch.addEventListener('input', apply);
+  }
+
+  // NEW: Confirm table search filter
+  const confirmSearch = document.getElementById('confirmSearch');
+  if (confirmSearch) {
+    const rows = Array.from(document.querySelectorAll('#confirmsBody .confirm-row'));
+    const apply2 = () => {
+      const q = (confirmSearch.value || '').toLowerCase().trim();
+      rows.forEach(r => {
+        const emailCell = r.querySelector('.col.col-5');
+        const hay = (emailCell ? emailCell.textContent : '').toLowerCase();
+        const show = !q || hay.includes(q);
+        r.style.display = show ? '' : 'none';
+        const div = r.nextElementSibling;
+        if (div && div.classList.contains('divider')) div.style.display = show ? '' : 'none';
+      });
+    };
+    confirmSearch.addEventListener('input', apply2);
   }
 </script>
 
