@@ -582,6 +582,88 @@ app.get("/admin/search", async function(req, res) {
   }
 });
 
+// --- Admin: Student Detail ---
+app.get("/admin/students/:email", async function(req, res) {
+  try {
+    const email = _.toLower(req.params.email);
+    const [st, slots, confirms] = await Promise.all([
+      Student.findOne({ email }).lean(),
+      Slot.find({ $or: [{ studentEmail: email }, { studentEmail: null }, { studentEmail: "" }] }).lean(), // claimed + open to add
+      Confirm.findOne({ email }).lean()
+    ]);
+    if (!st) return errorPage(res, "Student not found");
+    // group slots: claimed by this student vs open
+    const claimed = slots.filter(s => (s.studentEmail||"").toLowerCase() === email);
+    const open    = slots.filter(s => !s.studentEmail);
+    res.render("admin-student.ejs", {
+      s: st,
+      claimed,
+      open,
+      confirmed: !!(confirms && confirms.confirmed)
+    });
+  } catch (e) { return errorPage(res, e); }
+});
+
+// --- Admin: Update basic fields (name, school, group, isLyte, archive toggle) ---
+app.post("/admin/students/:email/update", async function(req, res) {
+  try {
+    const email = _.toLower(req.params.email);
+    const patch = {
+      fName: (req.body.fName||"").trim(),
+      lName: (req.body.lName||"").trim(),
+      school: (req.body.school||"").trim(),
+      group: (req.body.group||"").trim(),
+      isLyte: req.body.isLyte === "on",
+    };
+    if (req.body.archive === "on") {
+      patch.isArchived = true; patch.archivedAt = new Date();
+    } else if (req.body.archive === "off") {
+      patch.isArchived = false; patch.archivedAt = null;
+    }
+    await Student.updateOne({ email }, { $set: patch });
+    res.redirect(req.get("Referer") || ("/admin/students/" + encodeURIComponent(email)));
+  } catch (e) { return errorPage(res, e); }
+});
+
+// --- Admin: Add a slot to this student (claim) ---
+app.post("/admin/students/:email/add-slot", async function(req, res) {
+  try {
+    const email = _.toLower(req.params.email);
+    const st = await Student.findOne({ email }).lean();
+    if (!st) return errorPage(res, "Student not found");
+    await Slot.updateOne(
+      { _id: req.body.slotId, $or: [{ studentEmail: { $exists: false } }, { studentEmail: "" }, { studentEmail: null }] },
+      { $set: { studentEmail: email, studentName: [st.fName, st.lName].filter(Boolean).join(" ") } }
+    );
+    res.redirect(req.get("Referer") || ("/admin/students/" + encodeURIComponent(email)));
+  } catch (e) { return errorPage(res, e); }
+});
+
+// --- Admin: Remove a slot from this student (unclaim) ---
+app.post("/admin/students/:email/remove-slot", async function(req, res) {
+  try {
+    const email = _.toLower(req.params.email);
+    await Slot.updateOne(
+      { _id: req.body.slotId, studentEmail: email },
+      { $unset: { studentEmail: "", studentName: "" } }
+    );
+    res.redirect(req.get("Referer") || ("/admin/students/" + encodeURIComponent(email)));
+  } catch (e) { return errorPage(res, e); }
+});
+
+// --- Admin: Reset / toggle confirmation for this student ---
+app.post("/admin/students/:email/reset-confirm", async function(req, res) {
+  try {
+    const email = _.toLower(req.params.email);
+    if (req.body.action === "clear") {
+      await Confirm.updateOne({ email }, { $unset: { confirmed: "" } }, { upsert: true });
+    } else if (req.body.action === "confirm") {
+      await Confirm.updateOne({ email }, { $set: { confirmed: true } }, { upsert: true });
+    }
+    res.redirect(req.get("Referer") || ("/admin/students/" + encodeURIComponent(email)));
+  } catch (e) { return errorPage(res, e); }
+});
+
 app.get('*', function(req, res) {
   res.redirect('/');
 });
