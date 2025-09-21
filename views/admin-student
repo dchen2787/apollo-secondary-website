@@ -102,18 +102,116 @@
 
       <div class="card">
         <h3 style="margin-top:0;">Add an Open Slot</h3>
-        <% if (!open.length) { %><div class="muted">No open slots available.</div><% } %>
-        <% open.forEach(function(sl){ %>
-          <div class="slot">
-            <div><b><%= sl.physName || '—' %></b> <span class="muted"><%= sl.physSpecialty || '' %></span></div>
-            <div class="muted"><%= sl.dDate || '-' %> • <%= sl.timeStart || '-' %> – <%= sl.timeEnd || '-' %> • <%= sl.location || '-' %></div>
-            <form action="/admin/students/<%= encodeURIComponent(s.email) %>/add-slot" method="post" style="margin-top:6px;">
-              <input type="hidden" name="slotId" value="<%= sl._id %>">
-              <button class="btn btn-dark" type="submit">Add to Student</button>
-            </form>
+      
+        <!-- Search bar -->
+        <div style="margin:8px 0;">
+          <input id="openSlotSearch" class="input" placeholder="Search open slots by physician, specialty, location, notes, date, time">
+        </div>
+      
+        <!-- Results list -->
+        <div id="openSlotResults" class="muted" style="font-size:14px;">
+          Type to search open slots…
+        </div>
+      
+        <div class="divider" style="margin:12px 0;"></div>
+      
+        <!-- Manual create -->
+        <h4 style="margin:0 0 8px;">Or create a slot manually</h4>
+        <form action="/admin/students/<%= encodeURIComponent(s.email) %>/create-slot" method="post">
+          <div class="row2">
+            <div>
+              <label>Physician Name</label>
+              <input class="input" name="physName" placeholder="e.g., Dr. Smith">
+            </div>
+            <div>
+              <label>Specialty</label>
+              <input class="input" name="physSpecialty" placeholder="e.g., Family Medicine (PCP)">
+            </div>
           </div>
-        <% }) %>
+          <div class="row2" style="margin-top:8px;">
+            <div>
+              <label>Date</label>
+              <input class="input" type="date" name="date">
+            </div>
+            <div>
+              <label>Time</label>
+              <div class="row2" style="grid-template-columns:1fr 1fr; gap:8px;">
+                <input class="input" name="timeStart" placeholder="Start (e.g., 9:00 AM)">
+                <input class="input" name="timeEnd" placeholder="End (e.g., 11:30 AM)">
+              </div>
+            </div>
+          </div>
+          <div style="margin-top:8px;">
+            <label>Location</label>
+            <input class="input" name="location" placeholder="Clinic / Address">
+          </div>
+          <div style="margin-top:8px;">
+            <label>Notes</label>
+            <input class="input" name="notes" placeholder="Optional notes">
+          </div>
+          <button class="btn btn-dark" type="submit" style="margin-top:10px;">Create & assign to student</button>
+        </form>
       </div>
+      
+      <script>
+        (function(){
+          const search = document.getElementById('openSlotSearch');
+          const results = document.getElementById('openSlotResults');
+          if (!search || !results) return;
+      
+          let inflight = 0;
+          async function fetchSlots(q) {
+            inflight++;
+            const myId = inflight;
+            const url = "/admin/students/<%= encodeURIComponent(s.email) %>/open-slots?q=" + encodeURIComponent(q||"");
+            try {
+              const r = await fetch(url, { headers: { "Accept": "application/json" } });
+              const data = await r.json();
+              // out-of-order protection
+              if (myId !== inflight) return;
+              if (!data.ok) throw new Error(data.error || "Failed to load open slots");
+      
+              if (!data.results.length) {
+                results.innerHTML = '<div class="muted">No open slots found.</div>';
+                return;
+              }
+      
+              // render list
+              results.innerHTML = data.results.map(sl => {
+                const subtitle = [
+                  sl.dDate || (sl.date ? new Date(sl.date).toISOString().slice(0,10) : "-"),
+                  (sl.timeStart || "-") + " – " + (sl.timeEnd || "-"),
+                  sl.location || "-"
+                ].join(" • ");
+      
+                return `
+                  <div class="slot" style="border-top:1px dashed #e5e7eb;padding-top:10px;margin-top:10px;">
+                    <div><b>${sl.physName || '—'}</b> <span class="muted">${sl.physSpecialty || ''}</span></div>
+                    <div class="muted">${subtitle}</div>
+                    ${sl.notes ? `<div class="muted"><em>Notes:</em> ${sl.notes}</div>` : ""}
+                    <form action="/admin/students/<%= encodeURIComponent(s.email) %>/add-slot" method="post" style="margin-top:6px;">
+                      <input type="hidden" name="slotId" value="${sl._id}">
+                      <button class="btn btn-dark" type="submit">Add to Student</button>
+                    </form>
+                  </div>
+                `;
+              }).join("");
+            } catch (e) {
+              results.innerHTML = '<div class="muted">Error loading open slots.</div>';
+            }
+          }
+      
+          // initial load (all opens)
+          fetchSlots("");
+      
+          let t = null;
+          search.addEventListener('input', () => {
+            clearTimeout(t);
+            t = setTimeout(() => fetchSlots(search.value), 250);
+          });
+        })();
+      </script>
+
     </div>
   </div>
 </div>
