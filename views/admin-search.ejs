@@ -74,7 +74,10 @@
           <div class="student-head">
             <div>
               <div style="font-size:18px; font-weight:700;">
-                <%= s.name %> <span class="muted">(<%= s.email %>)</span>
+                <a href="/admin/students/<%= encodeURIComponent(s.email) %>">
+                  <%= s.name %>
+                </a>
+                <span class="muted">(<%= s.email %>)</span>
                 <% if (s.isLyte) { %><span class="pill pill-lyte">LYTE</span><% } %>
                 <% if (s.confirmed) { %><span class="pill pill-confirm">Confirmed</span><% } %>
                 <% if (s.matchingLocked) { %><span class="pill pill-lock">Matching Locked</span><% } %>
