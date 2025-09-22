@@ -691,6 +691,26 @@ app.post("/admin/students/:email/update", async function(req, res) {
   } catch (e) { return errorPage(res, e); }
 });
 
+
+// Admin: snapshot ALL currently confirmed students' claims to archivedSlots
+app.post("/admin/archive-confirmed-sweep", async function(req, res) {
+  try {
+    const confirmed = await Confirm.find({ confirmed: true }).lean();
+    const now = new Date();
+    const season = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+    let total = 0;
+    for (const c of confirmed) {
+      const email = (c.email || "").toLowerCase();
+      if (!email) continue;
+      const { upserted } = await snapshotConfirmedSlotsToArchive(email, season);
+      total += upserted;
+    }
+    return renderAdminHome(res, `Archived snapshot complete. New records inserted: ${total}.`);
+  } catch (err) {
+    return errorPage(res, err);
+  }
+});
+
 // --- Admin: Add a slot to this student (claim) ---
 app.post("/admin/students/:email/add-slot", async function(req, res) {
   try {
