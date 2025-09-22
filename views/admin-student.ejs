@@ -100,36 +100,177 @@
         <% }) %>
       </div>
 
-      <div class="card">
-        <h3 style="margin-top:0;">Add an Open Slot</h3>
-        <% if (!open.length) { %><div class="muted">No open slots available.</div><% } %>
-        <% open.forEach(function(sl){ %>
-          <div class="slot">
-            <div><b><%= sl.physName || '—' %></b> <span class="muted"><%= sl.physSpecialty || '' %></span></div>
-            <div class="muted"><%= sl.dDate || '-' %> • <%= sl.timeStart || '-' %> – <%= sl.timeEnd || '-' %> • <%= sl.location || '-' %></div>
-            <form action="/admin/students/<%= encodeURIComponent(s.email) %>/add-slot" method="post" style="margin-top:6px;">
-              <input type="hidden" name="slotId" value="<%= sl._id %>">
-              <button class="btn btn-dark" type="submit">Add to Student</button>
-            </form>
-          </div>
-        <% }) %>
-      </div>
+// add open slots
 
       <div class="card">
-        <h3 style="margin-top:0;">Past Confirmed Slots (<%= (archived && archived.length) || 0 %>)</h3>
+        <h3 style="margin-top:0;">Add an Open Slot</h3>
+      
+        <!-- Search bar -->
+        <div style="margin:8px 0;">
+          <input id="openSlotSearch" class="input" placeholder="Search by physician, specialty, location, notes, date, or time">
+        </div>
+      
+        <!-- Results list -->
+        <div id="openSlotResults" class="muted" style="font-size:14px;">
+          Loading open slots…
+        </div>
+      
+        <div class="divider" style="margin:12px 0;"></div>
+      
+        <!-- Collapsible manual add -->
+        <button id="toggleManual" class="btn btn-light" type="button">+ Manual Add</button>
+        <form id="manualForm" action="/admin/students/<%= encodeURIComponent(s.email) %>/create-slot" method="post" style="display:none; margin-top:8px;">
+          <div class="row2">
+            <div>
+              <label>Physician Name</label>
+              <input class="input" name="physName" required>
+            </div>
+            <div>
+              <label>Specialty</label>
+              <input class="input" name="physSpecialty">
+            </div>
+          </div>
+          <div class="row2" style="margin-top:8px;">
+            <div>
+              <label>Date</label>
+              <input class="input" type="date" name="date">
+            </div>
+            <div>
+              <label>Time</label>
+              <div class="row2" style="grid-template-columns:1fr 1fr;">
+                <input class="input" name="timeStart" placeholder="Start (e.g., 9:00 AM)">
+                <input class="input" name="timeEnd" placeholder="End (e.g., 11:30 AM)">
+              </div>
+            </div>
+          </div>
+          <div style="margin-top:8px;">
+            <label>Location</label>
+            <input class="input" name="location">
+          </div>
+          <div style="margin-top:8px;">
+            <label>Notes</label>
+            <input class="input" name="notes">
+          </div>
+          <button class="btn btn-dark" type="submit" style="margin-top:10px;">Create & assign</button>
+        </form>
+      </div>
+      
+      <script>
+        (function(){
+          const search = document.getElementById('openSlotSearch');
+          const results = document.getElementById('openSlotResults');
+          const toggle = document.getElementById('toggleManual');
+          const form = document.getElementById('manualForm');
+      
+          if (toggle && form) {
+            toggle.addEventListener('click', () => {
+              const show = form.style.display === 'none';
+              form.style.display = show ? '' : 'none';
+              toggle.textContent = show ? '− Hide Manual Add' : '+ Manual Add';
+            });
+          }
+      
+          async function fetchSlots(q){
+            const url = "/admin/students/<%= encodeURIComponent(s.email) %>/open-slots?q=" + encodeURIComponent(q||"");
+            try {
+              const r = await fetch(url, { headers: { "Accept":"application/json" }});
+              const data = await r.json();
+              if (!data.ok) throw new Error(data.error || 'Failed');
+              if (!data.results.length) {
+                results.innerHTML = '<div class="muted">No open slots found.</div>';
+                return;
+              }
+              results.innerHTML = data.results.map(sl => {
+                const subtitle = [
+                  sl.dDate || (sl.date ? new Date(sl.date).toISOString().slice(0,10) : "-"),
+                  (sl.timeStart || "-") + " – " + (sl.timeEnd || "-"),
+                  sl.location || "-"
+                ].join(" • ");
+                return `
+                  <div class="slot" style="border-top:1px dashed #e5e7eb;padding-top:10px;margin-top:10px;">
+                    <div><b>${sl.physName || '—'}</b> <span class="muted">${sl.physSpecialty || ''}</span></div>
+                    <div class="muted">${subtitle}</div>
+                    ${sl.notes ? `<div class="muted"><em>Notes:</em> ${sl.notes}</div>` : ""}
+                    <form action="/admin/students/<%= encodeURIComponent(s.email) %>/add-slot" method="post" style="margin-top:6px;">
+                      <input type="hidden" name="slotId" value="${sl._id}">
+                      <button class="btn btn-dark" type="submit">Add to Student</button>
+                    </form>
+                  </div>
+                `;
+              }).join("");
+            } catch(e) {
+              results.innerHTML = '<div class="muted">Error loading open slots.</div>';
+            }
+          }
+      
+          // debounce
+          let t=null;
+          search.addEventListener('input', function(){
+            clearTimeout(t);
+            t = setTimeout(() => fetchSlots(search.value), 250);
+          });
+      
+          // initial load
+          fetchSlots("");
+        })();
+      </script>
+
+
+      <div class="card">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+          <h3 style="margin:0;">Past Confirmed Slots (<%= (archived && archived.length) || 0 %>)</h3>
+          <a class="btn btn-light" href="/admin/students/<%= encodeURIComponent(s.email) %>/archives.csv">Download CSV</a>
+        </div>
+      
+        <div class="muted" style="margin:8px 0;">
+          Archived Hours (sum): <b><%= (totals && totals.archivedHours != null) ? totals.archivedHours.toFixed(2) : "0.00" %></b>
+        </div>
+      
         <% if (!archived || !archived.length) { %>
           <div class="muted">No archived slots.</div>
         <% } else { %>
-          <% archived.forEach(function(h){ %>
+          <% archived.forEach(function(h){ 
+               const dateIso = h.date ? new Date(h.date).toISOString().slice(0,10) : "";
+          %>
             <div class="slot">
-              <div><b><%= h.physName || '—' %></b> <span class="muted"><%= h.physSpecialty || '' %></span></div>
-              <div class="muted">
-                <%= h.date ? (new Date(h.date)).toDateString() : '-' %> •
-                <%= h.timeStart || '-' %> – <%= h.timeEnd || '-' %> •
-                <%= h.location || '-' %>
-              </div>
-              <% if (h.notes) { %><div class="muted"><em>Notes:</em> <%= h.notes %></div><% } %>
-              <div class="muted">
+              <form action="/admin/archived-slots/<%= h._id %>/update" method="post" class="row2">
+                <input type="hidden" name="studentEmail" value="<%= s.email %>">
+                <div>
+                  <label>Physician</label>
+                  <input class="input" name="physName" value="<%= h.physName || '' %>">
+                </div>
+                <div>
+                  <label>Specialty</label>
+                  <input class="input" name="physSpecialty" value="<%= h.physSpecialty || '' %>">
+                </div>
+                <div>
+                  <label>Date</label>
+                  <input class="input" type="date" name="date" value="<%= dateIso %>">
+                </div>
+                <div>
+                  <label>Time (Start / End)</label>
+                  <div class="row2" style="grid-template-columns:1fr 1fr;">
+                    <input class="input" name="timeStart" value="<%= h.timeStart || '' %>">
+                    <input class="input" name="timeEnd" value="<%= h.timeEnd || '' %>">
+                  </div>
+                </div>
+                <div>
+                  <label>Location</label>
+                  <input class="input" name="location" value="<%= h.location || '' %>">
+                </div>
+                <div>
+                  <label>Notes</label>
+                  <input class="input" name="notes" value="<%= h.notes || '' %>">
+                </div>
+                <div style="display:flex; align-items:flex-end; gap:8px;">
+                  <button class="btn btn-dark" type="submit">Save</button>
+                  <form action="/admin/archived-slots/<%= h._id %>/delete" method="post" onsubmit="return confirm('Delete this archived slot?');">
+                    <input type="hidden" name="studentEmail" value="<%= s.email %>">
+                    <button class="btn btn-light" type="submit">Remove</button>
+                  </form>
+                </div>
+              </form>
+              <div class="muted" style="margin-top:6px;">
                 Archived: <%= (h.capturedAt && h.capturedAt.toISOString) ? h.capturedAt.toISOString() : '' %>
                 • Season: <%= h.season || '-' %>
               </div>
@@ -137,6 +278,52 @@
           <% }) %>
         <% } %>
       </div>
+
+//hour logger
+      <div class="card">
+        <h3 style="margin-top:0;">Hour Logger</h3>
+        <div class="muted" style="margin-bottom:8px;">
+          Archived Hours: <b><%= totals.archivedHours.toFixed(2) %></b> •
+          Adjustments: <b><%= totals.adjustments.toFixed(2) %></b> •
+          Lifetime Total: <b><%= totals.lifetimeHours.toFixed(2) %></b>
+        </div>
+      
+        <form action="/admin/students/<%= encodeURIComponent(s.email) %>/hours/add" method="post" class="row2">
+          <div>
+            <label>Delta Hours (e.g., 1.5 or -0.5)</label>
+            <input class="input" name="deltaHours" placeholder="e.g., 1.5" required>
+          </div>
+          <div>
+            <label>Reason</label>
+            <input class="input" name="reason" placeholder="e.g., manual correction">
+          </div>
+          <div style="display:flex; align-items:flex-end;">
+            <button class="btn btn-dark" type="submit">Add Adjustment</button>
+          </div>
+        </form>
+      
+        <div class="divider" style="margin:12px 0;"></div>
+      
+        <h4 style="margin:0 0 8px;">Adjustment Ledger</h4>
+        <% if (!hourLogs || !hourLogs.length) { %>
+          <div class="muted">No adjustments.</div>
+        <% } else { %>
+          <% hourLogs.forEach(function(a){ %>
+            <div class="slot" style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+              <div>
+                <b><%= (a.deltaHours >= 0 ? '+' : '') + Number(a.deltaHours).toFixed(2) %> hrs</b>
+                <span class="muted">• <%= a.reason || '(no reason)' %> • <%= new Date(a.createdAt).toLocaleString() %></span>
+              </div>
+              <form action="/admin/students/<%= encodeURIComponent(s.email) %>/hours/remove" method="post"
+                    onsubmit="return confirm('Remove this adjustment?');">
+                <input type="hidden" name="id" value="<%= a._id %>">
+                <button class="btn btn-light" type="submit">Delete</button>
+              </form>
+            </div>
+          <% }) %>
+        <% } %>
+      </div>
+
 
     </div>
   </div>
