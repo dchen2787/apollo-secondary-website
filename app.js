@@ -213,10 +213,8 @@ function slotHours(slot) {
   return Math.round((diffMin / 60) * 100) / 100; // 2 decimals
 }
 
-function archivedSlotHours(h) {
-  // h has timeStart/timeEnd like live slots
-  return slotHours(h);
-}
+function archivedSlotHours(h) { return slotHours(h); }
+
 
 function setDisplayValues(slots){
   const list = Array.isArray(slots) ? slots : [];
@@ -672,8 +670,9 @@ app.get("/admin/students/:email", async function(req, res) {
     const claimed = slots.filter(s => (s.studentEmail||"").toLowerCase() === email);
     const open    = slots.filter(s => !s.studentEmail);
 
+    const archivedWithHours = (archived || []).map(h => ({ ...h, _hours: archivedSlotHours(h) || 0 }));
     const currentClaimedHours = (claimed || []).reduce((sum, s) => sum + slotHours(s), 0);
-    const archivedHours = (archived || []).reduce((sum, h) => sum + archivedSlotHours(h), 0);
+    const archivedHours = archivedWithHours.reduce((sum, h) => sum + h._hours, 0);
     const adjustments = (hourLogs || []).reduce((sum, a) => sum + (Number(a.deltaHours)||0), 0);
     const lifetimeHours = Math.round((archivedHours + adjustments) * 100) / 100;
 
@@ -682,7 +681,7 @@ app.get("/admin/students/:email", async function(req, res) {
       claimed,
       open,
       confirmed: !!(confirms && confirms.confirmed),
-      archived,
+      archived: archivedWithHours,
       hourLogs,
       totals: {
         currentClaimedHours: Math.round(currentClaimedHours * 100) / 100,
@@ -693,6 +692,7 @@ app.get("/admin/students/:email", async function(req, res) {
     });
   } catch (e) { return errorPage(res, e); }
 });
+
 
 
 // --- Admin: Update basic fields (name, school, group, isLyte, archive toggle) ---
@@ -791,7 +791,7 @@ app.get("/admin/students/:email/open-slots", async function(req, res) {
     }).lean();
 
     const filtered = open.filter(sl => {
-      if (!q) return true;
+      if (!q) return false; // <- require a query now; no empty-list dump
       const hay = [
         sl.physName, sl.physSpecialty, sl.location, sl.notes,
         sl.dDate, sl.timeStart, sl.timeEnd
@@ -799,12 +799,12 @@ app.get("/admin/students/:email/open-slots", async function(req, res) {
       return hay.includes(q);
     });
 
-    // cap results
     res.json({ ok: true, results: filtered.slice(0, 50) });
   } catch (e) {
     res.status(500).json({ ok: false, error: e?.message || String(e) });
   }
 });
+
 
 // Add an hour adjustment
 app.post("/admin/students/:email/hours/add", async function(req, res) {
@@ -945,6 +945,62 @@ app.post("/admin-login", function(req, res) {
     });
   });
 });
+
+// Create a new archived slot (manual add)
+app.post("/admin/archived-slots/create", async function(req, res) {
+  try {
+    const email = _.toLower(req.body.studentEmail || "");
+    if (!email) throw new Error("Missing studentEmail");
+    const st = await Student.findOne({ email }).lean();
+    if (!st) throw new Error("Student not found");
+
+    const doc = {
+      studentEmail: email,
+      studentName: [st.fName, st.lName].filter(Boolean).join(" "),
+      physName: (req.body.physName||"").trim(),
+      physSpecialty: (req.body.physSpecialty||"").trim(),
+      date: req.body.date ? new Date(req.body.date) : null,
+      timeStart: (req.body.timeStart||"").trim(),
+      timeEnd: (req.body.timeEnd||"").trim(),
+      location: (req.body.location||"").trim(),
+      notes: (req.body.notes||"").trim(),
+      season: (req.body.season||"").trim() || ""
+    };
+    await ArchivedSlot.create(doc);
+    res.redirect(req.get("Referer") || "/admin");
+  } catch (e) { return errorPage(res, e); }
+});
+
+// Update an archived slot
+app.post("/admin/archived-slots/:id/update", async function(req, res) {
+  try {
+    const id = req.params.id;
+    const email = _.toLower(req.body.studentEmail || "");
+    const patch = {
+      physName: (req.body.physName||"").trim(),
+      physSpecialty: (req.body.physSpecialty||"").trim(),
+      location: (req.body.location||"").trim(),
+      notes: (req.body.notes||"").trim(),
+      timeStart: (req.body.timeStart||"").trim(),
+      timeEnd: (req.body.timeEnd||"").trim(),
+      season: (req.body.season||"").trim()
+    };
+    patch.date = req.body.date ? new Date(req.body.date) : null;
+    await ArchivedSlot.updateOne({ _id: id, studentEmail: email }, { $set: patch });
+    res.redirect(req.get("Referer") || "/admin");
+  } catch (e) { return errorPage(res, e); }
+});
+
+// Delete an archived slot
+app.post("/admin/archived-slots/:id/delete", async function(req, res) {
+  try {
+    const id = req.params.id;
+    const email = _.toLower(req.body.studentEmail || "");
+    await ArchivedSlot.deleteOne({ _id: id, studentEmail: email });
+    res.redirect(req.get("Referer") || "/admin");
+  } catch (e) { return errorPage(res, e); }
+});
+
 
 // Activate account
 app.post("/activate-account", function(req,res){
