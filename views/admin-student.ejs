@@ -104,14 +104,12 @@
       <div class="card">
         <h3 style="margin-top:0;">Add an Open Slot</h3>
       
-        <!-- Search bar -->
         <div style="margin:8px 0;">
-          <input id="openSlotSearch" class="input" placeholder="Search by physician, specialty, location, notes, date, or time">
+          <input id="openSlotSearch" class="input" placeholder="Type at least 2 characters to search">
         </div>
       
-        <!-- Results list -->
         <div id="openSlotResults" class="muted" style="font-size:14px;">
-          Loading open slots…
+          Type at least 2 characters to search open slots…
         </div>
       
         <div class="divider" style="margin:12px 0;"></div>
@@ -202,31 +200,75 @@
             }
           }
       
-          // debounce
+          // debounce + min length
           let t=null;
           search.addEventListener('input', function(){
+            const q = (search.value || '').trim();
             clearTimeout(t);
-            t = setTimeout(() => fetchSlots(search.value), 250);
+            if (q.length < 2) {
+              results.innerHTML = 'Type at least 2 characters to search open slots…';
+              return;
+            }
+            t = setTimeout(() => fetchSlots(q), 250);
           });
-      
-          // initial load
-          fetchSlots("");
         })();
       </script>
 
+<!-- Hours & archived -->
 
       <div class="card">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
-          <h3 style="margin:0;">Past Confirmed Slots (<%= (archived && archived.length) || 0 %>)</h3>
+          <h3 style="margin:0;">Hours & Archived Slots</h3>
           <a class="btn btn-light" href="/admin/students/<%= encodeURIComponent(s.email) %>/archives.csv">Download CSV</a>
         </div>
       
         <div class="muted" style="margin:8px 0;">
-          Archived Hours (sum): <b><%= (totals && totals.archivedHours != null) ? totals.archivedHours.toFixed(2) : "0.00" %></b>
+          Archived Hours: <b><%= totals.archivedHours.toFixed(2) %></b> •
+          Adjustments: <b><%= totals.adjustments.toFixed(2) %></b> •
+          Lifetime Total: <b><%= totals.lifetimeHours.toFixed(2) %></b>
         </div>
       
+        <!-- Add manual adjustment -->
+        <form action="/admin/students/<%= encodeURIComponent(s.email) %>/hours/add" method="post" class="row2" style="margin-bottom:12px;">
+          <div>
+            <label>Delta Hours (e.g., 1.5 or -0.5)</label>
+            <input class="input" name="deltaHours" placeholder="e.g., 1.5" required>
+          </div>
+          <div>
+            <label>Reason</label>
+            <input class="input" name="reason" placeholder="e.g., correction / credit">
+          </div>
+          <div style="display:flex; align-items:flex-end;">
+            <button class="btn btn-dark" type="submit">Add Adjustment</button>
+          </div>
+        </form>
+      
+        <!-- Adjustment ledger -->
+        <h4 style="margin:0 0 8px;">Adjustments</h4>
+        <% if (!hourLogs || !hourLogs.length) { %>
+          <div class="muted">No adjustments.</div>
+        <% } else { %>
+          <% hourLogs.forEach(function(a){ %>
+            <div class="slot" style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+              <div>
+                <b><%= (a.deltaHours >= 0 ? '+' : '') + Number(a.deltaHours).toFixed(2) %> hrs</b>
+                <span class="muted">• <%= a.reason || '(no reason)' %> • <%= new Date(a.createdAt).toLocaleString() %></span>
+              </div>
+              <form action="/admin/students/<%= encodeURIComponent(s.email) %>/hours/remove" method="post"
+                    onsubmit="return confirm('Remove this adjustment?');">
+                <input type="hidden" name="id" value="<%= a._id %>">
+                <button class="btn btn-light" type="submit">Delete</button>
+              </form>
+            </div>
+          <% }) %>
+        <% } %>
+      
+        <div class="divider" style="margin:12px 0;"></div>
+      
+        <!-- Archived slots table (editable) -->
+        <h4 style="margin:0 0 8px;">Archived Slots (<%= (archived && archived.length) || 0 %>)</h4>
         <% if (!archived || !archived.length) { %>
-          <div class="muted">No archived slots.</div>
+          <div class="muted">No archived slots yet.</div>
         <% } else { %>
           <% archived.forEach(function(h){ 
                const dateIso = h.date ? new Date(h.date).toISOString().slice(0,10) : "";
@@ -261,6 +303,12 @@
                   <label>Notes</label>
                   <input class="input" name="notes" value="<%= h.notes || '' %>">
                 </div>
+      
+                <div>
+                  <label>Season</label>
+                  <input class="input" name="season" value="<%= h.season || '' %>">
+                </div>
+      
                 <div style="display:flex; align-items:flex-end; gap:8px;">
                   <button class="btn btn-dark" type="submit">Save</button>
                   <form action="/admin/archived-slots/<%= h._id %>/delete" method="post" onsubmit="return confirm('Delete this archived slot?');">
@@ -270,58 +318,75 @@
                 </div>
               </form>
               <div class="muted" style="margin-top:6px;">
+                Hours: <b><%= (h._hours || 0).toFixed(2) %></b> •
                 Archived: <%= (h.capturedAt && h.capturedAt.toISOString) ? h.capturedAt.toISOString() : '' %>
                 • Season: <%= h.season || '-' %>
               </div>
             </div>
           <% }) %>
         <% } %>
-      </div>
-
-<!-- hour logger -->
-      <div class="card">
-        <h3 style="margin-top:0;">Hour Logger</h3>
-        <div class="muted" style="margin-bottom:8px;">
-          Archived Hours: <b><%= totals.archivedHours.toFixed(2) %></b> •
-          Adjustments: <b><%= totals.adjustments.toFixed(2) %></b> •
-          Lifetime Total: <b><%= totals.lifetimeHours.toFixed(2) %></b>
-        </div>
-      
-        <form action="/admin/students/<%= encodeURIComponent(s.email) %>/hours/add" method="post" class="row2">
-          <div>
-            <label>Delta Hours (e.g., 1.5 or -0.5)</label>
-            <input class="input" name="deltaHours" placeholder="e.g., 1.5" required>
-          </div>
-          <div>
-            <label>Reason</label>
-            <input class="input" name="reason" placeholder="e.g., manual correction">
-          </div>
-          <div style="display:flex; align-items:flex-end;">
-            <button class="btn btn-dark" type="submit">Add Adjustment</button>
-          </div>
-        </form>
       
         <div class="divider" style="margin:12px 0;"></div>
       
-        <h4 style="margin:0 0 8px;">Adjustment Ledger</h4>
-        <% if (!hourLogs || !hourLogs.length) { %>
-          <div class="muted">No adjustments.</div>
-        <% } else { %>
-          <% hourLogs.forEach(function(a){ %>
-            <div class="slot" style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
-              <div>
-                <b><%= (a.deltaHours >= 0 ? '+' : '') + Number(a.deltaHours).toFixed(2) %> hrs</b>
-                <span class="muted">• <%= a.reason || '(no reason)' %> • <%= new Date(a.createdAt).toLocaleString() %></span>
-              </div>
-              <form action="/admin/students/<%= encodeURIComponent(s.email) %>/hours/remove" method="post"
-                    onsubmit="return confirm('Remove this adjustment?');">
-                <input type="hidden" name="id" value="<%= a._id %>">
-                <button class="btn btn-light" type="submit">Delete</button>
-              </form>
+        <!-- Add a new archived slot -->
+        <button id="toggleAddArchived" class="btn btn-light" type="button">+ Add Archived Slot</button>
+        <form id="addArchivedForm" action="/admin/archived-slots/create" method="post" style="display:none; margin-top:8px;">
+          <input type="hidden" name="studentEmail" value="<%= s.email %>">
+          <div class="row2">
+            <div>
+              <label>Physician</label>
+              <input class="input" name="physName" required>
             </div>
-          <% }) %>
-        <% } %>
+            <div>
+              <label>Specialty</label>
+              <input class="input" name="physSpecialty">
+            </div>
+          </div>
+          <div class="row2" style="margin-top:8px;">
+            <div>
+              <label>Date</label>
+              <input class="input" type="date" name="date">
+            </div>
+            <div>
+              <label>Time (Start / End)</label>
+              <div class="row2" style="grid-template-columns:1fr 1fr;">
+                <input class="input" name="timeStart" placeholder="Start (e.g., 9:00 AM)">
+                <input class="input" name="timeEnd" placeholder="End (e.g., 11:30 AM)">
+              </div>
+            </div>
+          </div>
+          <div style="margin-top:8px;">
+            <label>Location</label>
+            <input class="input" name="location">
+          </div>
+          <div style="margin-top:8px;">
+            <label>Notes</label>
+            <input class="input" name="notes">
+          </div>
+          <div style="margin-top:8px;">
+            <label>Season</label>
+            <input class="input" name="season" placeholder="e.g., 2025 Spring">
+          </div>
+          <button class="btn btn-dark" type="submit" style="margin-top:10px;">Add Archived Slot</button>
+        </form>
       </div>
+      
+      <script>
+        (function(){
+          const btn = document.getElementById('toggleAddArchived');
+          const form = document.getElementById('addArchivedForm');
+          if (btn && form) {
+            btn.addEventListener('click', () => {
+              const show = form.style.display === 'none';
+              form.style.display = show ? '' : 'none';
+              btn.textContent = show ? '− Hide Add Archived Slot' : '+ Add Archived Slot';
+            });
+          }
+        })();
+      </script>
+
+
+
 
 
     </div>
