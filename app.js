@@ -90,6 +90,15 @@ archivedSlotSchema.index({ studentEmail: 1, sourceSlotId: 1 }, { unique: true })
 // IMPORTANT: 3rd arg forces the collection name to be exactly "archivedSlots"
 const ArchivedSlot = mongoose.model("ArchivedSlot", archivedSlotSchema, "archivedSlots");
 
+// Hour logger (simple adjustments: +/− hours with reason)
+const hourLogSchema = new mongoose.Schema({
+  studentEmail: { type: String, index: true },
+  deltaHours: Number,     // positive or negative
+  reason: String,
+  createdAt: { type: Date, default: Date.now }
+});
+const StudentHourLog = mongoose.model("StudentHourLog", hourLogSchema);
+
 // Control doc now includes "phase"
 //  phase 0: View-only
 //  phase 1: PCP-only
@@ -202,6 +211,11 @@ function slotHours(slot) {
   if (start == null || end == null) return 0;
   const diffMin = Math.max(0, end - start);
   return Math.round((diffMin / 60) * 100) / 100; // 2 decimals
+}
+
+function archivedSlotHours(h) {
+  // h has timeStart/timeEnd like live slots
+  return slotHours(h);
 }
 
 function setDisplayValues(slots){
@@ -646,25 +660,36 @@ app.get("/admin/search", async function(req, res) {
 app.get("/admin/students/:email", async function(req, res) {
   try {
     const email = _.toLower(req.params.email);
-    const [st, slots, confirms] = await Promise.all([
+    const [st, slots, confirms, archived, hourLogs] = await Promise.all([
       Student.findOne({ email }).lean(),
       Slot.find({ $or: [{ studentEmail: email }, { studentEmail: null }, { studentEmail: "" }] }).lean(),
-      Confirm.findOne({ email }).lean()
+      Confirm.findOne({ email }).lean(),
+      ArchivedSlot.find({ studentEmail: email }).sort({ capturedAt: -1 }).lean(),
+      StudentHourLog.find({ studentEmail: email }).sort({ createdAt: -1 }).lean()
     ]);
     if (!st) return errorPage(res, "Student not found");
 
     const claimed = slots.filter(s => (s.studentEmail||"").toLowerCase() === email);
     const open    = slots.filter(s => !s.studentEmail);
 
-    // NEW: archived history
-    const archived = await ArchivedSlot.find({ studentEmail: email }).sort({ capturedAt: -1 }).lean();
+    const currentClaimedHours = (claimed || []).reduce((sum, s) => sum + slotHours(s), 0);
+    const archivedHours = (archived || []).reduce((sum, h) => sum + archivedSlotHours(h), 0);
+    const adjustments = (hourLogs || []).reduce((sum, a) => sum + (Number(a.deltaHours)||0), 0);
+    const lifetimeHours = Math.round((archivedHours + adjustments) * 100) / 100;
 
     res.render("admin-student", {
       s: st,
       claimed,
       open,
       confirmed: !!(confirms && confirms.confirmed),
-      archived   // <-- pass to EJS
+      archived,
+      hourLogs,
+      totals: {
+        currentClaimedHours: Math.round(currentClaimedHours * 100) / 100,
+        archivedHours: Math.round(archivedHours * 100) / 100,
+        adjustments: Math.round(adjustments * 100) / 100,
+        lifetimeHours
+      }
     });
   } catch (e) { return errorPage(res, e); }
 });
@@ -765,9 +790,8 @@ app.get("/admin/students/:email/open-slots", async function(req, res) {
       $or: [{ studentEmail: { $exists: false } }, { studentEmail: "" }, { studentEmail: null }]
     }).lean();
 
-    // basic text match across common fields
     const filtered = open.filter(sl => {
-      if (!q) return true; // if query empty, show all opens
+      if (!q) return true;
       const hay = [
         sl.physName, sl.physSpecialty, sl.location, sl.notes,
         sl.dDate, sl.timeStart, sl.timeEnd
@@ -775,12 +799,76 @@ app.get("/admin/students/:email/open-slots", async function(req, res) {
       return hay.includes(q);
     });
 
-    // return the first 50 to keep it snappy
+    // cap results
     res.json({ ok: true, results: filtered.slice(0, 50) });
   } catch (e) {
     res.status(500).json({ ok: false, error: e?.message || String(e) });
   }
 });
+
+// Add an hour adjustment
+app.post("/admin/students/:email/hours/add", async function(req, res) {
+  try {
+    const email = _.toLower(req.params.email);
+    const delta = parseFloat(req.body.deltaHours || "0");
+    const reason = (req.body.reason || "").trim();
+    if (!delta || !Number.isFinite(delta)) throw new Error("Invalid hour delta");
+    await StudentHourLog.create({ studentEmail: email, deltaHours: delta, reason });
+    res.redirect(req.get("Referer") || ("/admin/students/" + encodeURIComponent(email)));
+  } catch (e) { return errorPage(res, e); }
+});
+
+// Remove a specific adjustment
+app.post("/admin/students/:email/hours/remove", async function(req, res) {
+  try {
+    const email = _.toLower(req.params.email);
+    const id = req.body.id;
+    await StudentHourLog.deleteOne({ _id: id, studentEmail: email });
+    res.redirect(req.get("Referer") || ("/admin/students/" + encodeURIComponent(email)));
+  } catch (e) { return errorPage(res, e); }
+});
+
+app.get("/admin/students/:email/archives.csv", async function(req, res) {
+  try {
+    const email = _.toLower(req.params.email);
+    const hist = await ArchivedSlot.find({ studentEmail: email }).sort({ capturedAt: -1 }).lean();
+
+    const rows = [];
+    rows.push([
+      "Email","Student Name","Physician","Specialty","Date",
+      "Start","End","Location","Notes","Hours","Season","ArchivedAt"
+    ].join(","));
+
+    hist.forEach(h => {
+      const hours = archivedSlotHours(h) || 0;
+      const dDate = h.date ? new Date(h.date).toISOString().slice(0,10) : "";
+      const escaped = s => {
+        const t = (s == null ? "" : String(s));
+        return /[",\n]/.test(t) ? `"${t.replace(/"/g,'""')}"` : t;
+      };
+      rows.push([
+        email,
+        escaped(h.studentName || ""),
+        escaped(h.physName || ""),
+        escaped(h.physSpecialty || ""),
+        dDate,
+        escaped(h.timeStart || ""),
+        escaped(h.timeEnd || ""),
+        escaped(h.location || ""),
+        escaped(h.notes || ""),
+        (hours ? hours.toFixed(2) : "0"),
+        escaped(h.season || ""),
+        h.capturedAt ? new Date(h.capturedAt).toISOString() : ""
+      ].join(","));
+    });
+
+    const csv = rows.join("\n");
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename=${encodeURIComponent(email)}-archived-slots.csv`);
+    res.send(csv);
+  } catch (e) { return errorPage(res, e); }
+});
+
 // Create a new slot and assign it to this student
 app.post("/admin/students/:email/create-slot", async function(req, res) {
   try {
@@ -806,6 +894,36 @@ app.post("/admin/students/:email/create-slot", async function(req, res) {
     makeLog("Admin add slot", email, String(newSlot._id), String(newSlot._id));
 
     res.redirect(req.get("Referer") || ("/admin/students/" + encodeURIComponent(email)));
+  } catch (e) { return errorPage(res, e); }
+});
+
+// Update an archived slot
+app.post("/admin/archived-slots/:id/update", async function(req, res) {
+  try {
+    const id = req.params.id;
+    const email = _.toLower(req.body.studentEmail || "");
+    const patch = {
+      physName: (req.body.physName||"").trim(),
+      physSpecialty: (req.body.physSpecialty||"").trim(),
+      location: (req.body.location||"").trim(),
+      notes: (req.body.notes||"").trim(),
+      timeStart: (req.body.timeStart||"").trim(),
+      timeEnd: (req.body.timeEnd||"").trim()
+    };
+    // parse date yyyy-mm-dd
+    patch.date = req.body.date ? new Date(req.body.date) : null;
+    await ArchivedSlot.updateOne({ _id: id, studentEmail: email }, { $set: patch });
+    res.redirect(req.get("Referer") || "/admin");
+  } catch (e) { return errorPage(res, e); }
+});
+
+// Delete an archived slot
+app.post("/admin/archived-slots/:id/delete", async function(req, res) {
+  try {
+    const id = req.params.id;
+    const email = _.toLower(req.body.studentEmail || "");
+    await ArchivedSlot.deleteOne({ _id: id, studentEmail: email });
+    res.redirect(req.get("Referer") || "/admin");
   } catch (e) { return errorPage(res, e); }
 });
 
