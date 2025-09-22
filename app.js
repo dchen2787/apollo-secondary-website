@@ -65,6 +65,31 @@ const confirmSchema = new mongoose.Schema({
 });
 const Confirm = mongoose.model("Confirm", confirmSchema);
 
+
+// ---- Archived slots (same DB/cluster; separate collection) ----
+const archivedSlotSchema = new mongoose.Schema({
+  studentEmail: { type: String, index: true },
+  studentName: String,
+
+  physName: String,
+  physSpecialty: String,
+  date: Date,
+  timeStart: String,
+  timeEnd: String,
+  location: String,
+  notes: String,
+
+  capturedAt: { type: Date, default: Date.now }, // when we snapshotted
+  season: String,                                  // e.g., "2025-09" or "2025 Spring"
+  sourceSlotId: { type: String, index: true }      // _id of the live slot at confirm time
+}, { strict: true });
+
+// prevent duplicates if confirm is triggered more than once
+archivedSlotSchema.index({ studentEmail: 1, sourceSlotId: 1 }, { unique: true });
+
+// IMPORTANT: 3rd arg forces the collection name to be exactly "archivedSlots"
+const ArchivedSlot = mongoose.model("ArchivedSlot", archivedSlotSchema, "archivedSlots");
+
 // Control doc now includes "phase"
 //  phase 0: View-only
 //  phase 1: PCP-only
@@ -115,6 +140,41 @@ function makeLog(type, user, update, slotId){
   });
 }
 
+async function snapshotConfirmedSlotsToArchive(studentEmail, seasonLabel = "") {
+  const email = (studentEmail || "").toLowerCase().trim();
+  if (!email) return { upserted: 0 };
+
+  // All currently claimed slots for this student
+  const claimed = await Slot.find({ studentEmail: email }).lean();
+  if (!claimed.length) return { upserted: 0 };
+
+  // Idempotent upsert per (studentEmail, sourceSlotId)
+  const ops = claimed.map(sl => ({
+    updateOne: {
+      filter: { studentEmail: email, sourceSlotId: String(sl._id) },
+      update: {
+        $setOnInsert: {
+          studentEmail: email,
+          studentName: sl.studentName || "",
+          physName: sl.physName || "",
+          physSpecialty: sl.physSpecialty || "",
+          date: sl.date || null,
+          timeStart: sl.timeStart || "",
+          timeEnd: sl.timeEnd || "",
+          location: sl.location || "",
+          notes: sl.notes || "",
+          season: seasonLabel || ""
+        },
+        $set: { capturedAt: new Date() }
+      },
+      upsert: true
+    }
+  }));
+
+  const res = await ArchivedSlot.bulkWrite(ops, { ordered: false });
+  return { upserted: res.upsertedCount || 0 };
+}
+// c
 // Parse times like "1:00 PM", "09:30 am" to minutes since midnight
 function parseTimeToMinutes(t) {
   if (!t || typeof t !== 'string') return null;
@@ -588,21 +648,27 @@ app.get("/admin/students/:email", async function(req, res) {
     const email = _.toLower(req.params.email);
     const [st, slots, confirms] = await Promise.all([
       Student.findOne({ email }).lean(),
-      Slot.find({ $or: [{ studentEmail: email }, { studentEmail: null }, { studentEmail: "" }] }).lean(), // claimed + open to add
+      Slot.find({ $or: [{ studentEmail: email }, { studentEmail: null }, { studentEmail: "" }] }).lean(),
       Confirm.findOne({ email }).lean()
     ]);
     if (!st) return errorPage(res, "Student not found");
-    // group slots: claimed by this student vs open
+
     const claimed = slots.filter(s => (s.studentEmail||"").toLowerCase() === email);
     const open    = slots.filter(s => !s.studentEmail);
+
+    // NEW: archived history
+    const archived = await ArchivedSlot.find({ studentEmail: email }).sort({ capturedAt: -1 }).lean();
+
     res.render("admin-student", {
       s: st,
       claimed,
       open,
-      confirmed: !!(confirms && confirms.confirmed)
+      confirmed: !!(confirms && confirms.confirmed),
+      archived   // <-- pass to EJS
     });
   } catch (e) { return errorPage(res, e); }
 });
+
 
 // --- Admin: Update basic fields (name, school, group, isLyte, archive toggle) ---
 app.post("/admin/students/:email/update", async function(req, res) {
@@ -659,10 +725,16 @@ app.post("/admin/students/:email/reset-confirm", async function(req, res) {
       await Confirm.updateOne({ email }, { $unset: { confirmed: "" } }, { upsert: true });
     } else if (req.body.action === "confirm") {
       await Confirm.updateOne({ email }, { $set: { confirmed: true } }, { upsert: true });
+
+      // snapshot on admin-driven confirm as well
+      const now = new Date();
+      const season = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+      await snapshotConfirmedSlotsToArchive(email, season);
     }
     res.redirect(req.get("Referer") || ("/admin/students/" + encodeURIComponent(email)));
   } catch (e) { return errorPage(res, e); }
 });
+
 
 
 // Search open slots (AJAX) — returns JSON list of open slots matching q
@@ -915,18 +987,27 @@ app.post("/unclaim", async function(req, res) {
 });
 
 // Confirm (sets confirmed flag, greys out button on home)
-app.post("/confirm", function(req, res) {
+// Confirm (sets confirmed flag, greys out button on home)
+app.post("/confirm", async function(req, res) {
   const userEmail = _.toLower(req.body.userEmail);
 
-  Confirm.updateOne(
-    { email: userEmail },
-    { $set: { confirmed: true } },
-    { upsert: true },
-    function(err) {
-      if (err) return errorPage(res, err);
-      return renderHome(res, userEmail, "Successfully confirmed your slots.");
-    }
-  );
+  try {
+    // 1) Set confirmed = true
+    await Confirm.updateOne(
+      { email: userEmail },
+      { $set: { confirmed: true } },
+      { upsert: true }
+    );
+
+    // 2) Snapshot current claims → archivedSlots (idempotent)
+    const now = new Date();
+    const season = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+    await snapshotConfirmedSlotsToArchive(userEmail, season);
+
+    return renderHome(res, userEmail, "Successfully confirmed your slots.");
+  } catch (err) {
+    return errorPage(res, err);
+  }
 });
 
 // Admin: match settings (lock toggle, phase, maxSlots)
