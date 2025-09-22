@@ -260,12 +260,18 @@
             <button type="submit" class="btn btn-danger">Reset All Confirmations (only at end of session)</button>
           </form>
 
+          <form action="/admin/archive-confirmed-sweep" method="post"
+                onsubmit="return confirm('Archive a snapshot of ALL confirmed students\\' current claims?');"
+                style="margin-bottom:12px;">
+            <button type="submit" class="btn">Archive snapshot for all confirmed students</button>
+          </form>
+
           <!-- NEW: search just this table -->
           <div class="form-inline" style="margin-bottom:12px;">
             <input id="confirmSearch" class="form-control" type="text"
                    placeholder="Search by email…" style="max-width:280px;">
           </div>
-
+    
           <div class="row row-head">
             <div class="col col-5">Email</div>
             <div class="col col-3">Status</div>
