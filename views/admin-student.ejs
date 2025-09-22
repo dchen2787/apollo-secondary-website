@@ -114,6 +114,30 @@
           </div>
         <% }) %>
       </div>
+
+      <div class="card">
+        <h3 style="margin-top:0;">Past Confirmed Slots (<%= (archived && archived.length) || 0 %>)</h3>
+        <% if (!archived || !archived.length) { %>
+          <div class="muted">No archived slots.</div>
+        <% } else { %>
+          <% archived.forEach(function(h){ %>
+            <div class="slot">
+              <div><b><%= h.physName || '—' %></b> <span class="muted"><%= h.physSpecialty || '' %></span></div>
+              <div class="muted">
+                <%= h.date ? (new Date(h.date)).toDateString() : '-' %> •
+                <%= h.timeStart || '-' %> – <%= h.timeEnd || '-' %> •
+                <%= h.location || '-' %>
+              </div>
+              <% if (h.notes) { %><div class="muted"><em>Notes:</em> <%= h.notes %></div><% } %>
+              <div class="muted">
+                Archived: <%= (h.capturedAt && h.capturedAt.toISOString) ? h.capturedAt.toISOString() : '' %>
+                • Season: <%= h.season || '-' %>
+              </div>
+            </div>
+          <% }) %>
+        <% } %>
+      </div>
+
     </div>
   </div>
 </div>
