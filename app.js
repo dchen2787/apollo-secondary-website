@@ -412,6 +412,29 @@ async function renderAdminHome(res, flashMsg = "", lyteOnly = false) {
   }
 }
 
+// Purge archived slot history for students archived >= 1 year ago
+async function purgeOldArchivedHistory() {
+  try {
+    const cutoff = new Date(Date.now() - 365*24*60*60*1000); // ~1 year
+    const oldStudents = await Student.find({
+      isArchived: true,
+      archivedAt: { $lte: cutoff }
+    }).select("email").lean();
+
+    const emails = oldStudents.map(s => (s.email || "").toLowerCase());
+    if (!emails.length) {
+      console.log("[purge] No archived students older than 1 year.");
+      return { deleted: 0, students: 0 };
+    }
+
+    const del = await ArchivedSlot.deleteMany({ studentEmail: { $in: emails } });
+    console.log(`[purge] Deleted ${del.deletedCount || 0} archived slot doc(s) for ${emails.length} student(s).`);
+    return { deleted: del.deletedCount || 0, students: emails.length };
+  } catch (e) {
+    console.error("[purge] Error:", e);
+    return { deleted: 0, students: 0, error: e?.message || String(e) };
+  }
+}
 
 // ---- CSV helpers ----
 function csvEscape(val) {
@@ -1384,6 +1407,17 @@ async function dedupeCollection(Model, collectionName) {
   }
 })();
 
+// ---- Automated daily purge of old archived history ----
+(async () => {
+  // run once on boot
+  await purgeOldArchivedHistory();
+
+  // then every 24h
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  setInterval(() => {
+    purgeOldArchivedHistory().catch(err => console.error("[purge] interval error:", err));
+  }, DAY_MS);
+})();
 
 app.listen(port, function() {
   console.log("Server started!");
