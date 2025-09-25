@@ -1034,7 +1034,7 @@ app.post("/login", function(req,res){
 
   Student.findOne({email}, function(err, foundUser){
     if(err) return res.render("login", {errM:"", errM2:"An error occured. Please try again."});
-    if(!foundUser) return res.render("login", {errM:"", errM2:"Username or password was incorrect."});
+    if(!foundUser) return res.render("login", {errM:"", errM2:"Username or password is incorrect."});
     if(!foundUser.fName) {
       return res.render("login", {errM:"", errM2:"Account not activated. Please activate your account (https://the-match-apolloyim-2f158c0ae122.herokuapp.com/activate-account) or contact apolloyimde@gmail.com."});
     }
