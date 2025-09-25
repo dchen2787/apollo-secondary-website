@@ -539,12 +539,13 @@ app.get("/activate-account", function(req,res){
 
 
 // --- Admin Search ---
+// --- Admin Search (ranked + full-name aware) ---
 app.get("/admin/search", async function(req, res) {
   try {
-    const q = (req.query.q || "").trim();
-    const query = q.toLowerCase();
+    const qRaw = (req.query.q || "").trim();
+    const query = qRaw.toLowerCase();
 
-    // counts for the header
+    // counts for header
     const [totalStudents, totalSlots] = await Promise.all([
       Student.countDocuments({}),
       Slot.countDocuments({})
@@ -560,9 +561,11 @@ app.get("/admin/search", async function(req, res) {
       });
     }
 
-    // --- Student search ---
-    // Match on name or email
-    const nameRx = new RegExp(_.escapeRegExp(query), "i");
+    const tokens = query.split(/\s+/).filter(Boolean);             // e.g., ["john","smith"]
+    const nameRx  = new RegExp(_.escapeRegExp(query), "i");        // whole query regex
+    const tokRxs  = tokens.map(t => new RegExp(_.escapeRegExp(t), "i"));
+
+    // fetch candidates (broad net); we’ll score in JS
     const students = await Student.find({
       $or: [
         { email: nameRx },
@@ -571,9 +574,11 @@ app.get("/admin/search", async function(req, res) {
       ]
     }).lean();
 
-    // For each student, gather claimed slots + hours + status
-    const byEmail = new Map();
+    // pull all slots once to compute totals quickly
     const slots = await Slot.find({}).lean();
+
+    // bucket slots by student
+    const byEmail = new Map();
     slots.forEach(s => {
       const em = (s.studentEmail || "").toLowerCase();
       if (!em) return;
@@ -581,31 +586,54 @@ app.get("/admin/search", async function(req, res) {
       byEmail.get(em).push(s);
     });
 
-    // confirmations map
+    // confirmations
     const confirms = await Confirm.find({}).lean();
     const confirmedMap = new Map(confirms.map(c => [c.email.toLowerCase(), !!c.confirmed]));
 
-    const studentResults = students.map(st => {
+    function scoreStudent(st) {
       const email = (st.email || "").toLowerCase();
-      const my = byEmail.get(email) || [];
-      const totalHours = my.reduce((sum, s) => {
-        const start = (s.timeStart || "").trim();
-        const end   = (s.timeEnd || "").trim();
-        // reuse your slotHours logic if available; otherwise quick calc fallback:
-        const parse = t => {
-          if (!t) return 0;
-          const m = /(\d+):(\d+)\s*(AM|PM)/i.exec(t);
-          if (!m) return 0;
-          let hh = parseInt(m[1],10) % 12;
-          const mm = parseInt(m[2],10);
-          if (m[3].toUpperCase() === "PM") hh += 12;
-          return hh + mm/60;
-        };
-        const hrs = Math.max(0, parse(end) - parse(start));
-        return sum + hrs;
-      }, 0);
+      const f = (st.fName || "").toLowerCase();
+      const l = (st.lName || "").toLowerCase();
+      const full = (f && l) ? (f + " " + l) : (f || l);
+
+      let score = 0;
+
+      // exact matches
+      if (email === query) score += 1000;
+      if (full === query)  score += 900;
+
+      // startsWith boosts
+      if (f.startsWith(tokens[0] || "")) score += 120;
+      if (l.startsWith(tokens[1] || "")) score += 120;
+      if (full.startsWith(query))        score += 180;
+
+      // token presence
+      tokens.forEach(t => {
+        if (f.includes(t)) score += 30;
+        if (l.includes(t)) score += 30;
+        if (email.includes(t)) score += 40;
+        if (full.includes(t))  score += 35;
+      });
+
+      // generic contains
+      if (full.includes(query))  score += 60;
+      if (email.includes(query)) score += 80;
+
+      // prefer active over archived when otherwise equal
+      if (!st.isArchived) score += 5;
+
+      return score;
+    }
+
+    const studentResultsScored = students.map(st => {
+      const email = (st.email || "").toLowerCase();
+      const mine = byEmail.get(email) || [];
+
+      // total hours
+      const totalHours = mine.reduce((sum, s) => sum + slotHours(s), 0);
 
       return {
+        _score: scoreStudent(st),
         name: [st.fName, st.lName].filter(Boolean).join(" ") || st.email,
         email: st.email,
         group: st.group,
@@ -613,14 +641,24 @@ app.get("/admin/search", async function(req, res) {
         isLyte: !!st.isLyte,
         confirmed: !!confirmedMap.get(email),
         matchingLocked: !!st.matchingLocked,
-        isArchived: !!st.isArchived,            // will render Archive/Unarchive buttons
-        totalSlots: my.length,
+        isArchived: !!st.isArchived,
+        totalSlots: mine.length,
         totalHours,
-        slots: my
+        slots: mine
       };
     });
 
-    // --- Physician/slot search ---
+    // sort by score desc, then by hours, then slots, then name
+    const studentResults = studentResultsScored
+      .sort((a, b) =>
+        (b._score - a._score) ||
+        (b.totalHours - a.totalHours) ||
+        (b.totalSlots - a.totalSlots) ||
+        a.name.localeCompare(b.name)
+      )
+      .map(({ _score, ...rest }) => rest); // strip score before rendering
+
+    // Physician/slot search (basic contains; could be ranked similarly if needed)
     const physMatches = slots.filter(s => {
       const hay = [
         s.physName, s.physSpecialty, s.location,
@@ -629,7 +667,6 @@ app.get("/admin/search", async function(req, res) {
       return hay.includes(query);
     });
 
-    // group by physician for display
     const byPhys = new Map();
     physMatches.forEach(s => {
       const key = (s.physName || "—") + "||" + (s.physSpecialty || "");
@@ -643,7 +680,7 @@ app.get("/admin/search", async function(req, res) {
     });
 
     return res.render("admin-search", {
-      query: q,
+      query: qRaw,
       totalStudents,
       totalSlots,
       studentResults,
@@ -653,6 +690,7 @@ app.get("/admin/search", async function(req, res) {
     return errorPage(res, e);
   }
 });
+
 
 // --- Admin: Student Detail ---
 app.get("/admin/students/:email", async function(req, res) {
@@ -1288,6 +1326,26 @@ app.post("/admin/students/:email/unarchive", async function(req, res){
   } catch (e) { return errorPage(res, e); }
 });
 
+// Admin: purge archived slot history for students archived >= 1 year ago
+app.post("/admin/purge-archived-history", async function(req, res) {
+  try {
+    const cutoff = new Date(Date.now() - 365*24*60*60*1000); // ~1 year
+    const oldStudents = await Student.find({
+      isArchived: true,
+      archivedAt: { $lte: cutoff }
+    }).select("email").lean();
+
+    const emails = oldStudents.map(s => (s.email || "").toLowerCase());
+    if (!emails.length) {
+      return renderAdminHome(res, "No archived students older than 1 year.");
+    }
+
+    const del = await ArchivedSlot.deleteMany({ studentEmail: { $in: emails } });
+    return renderAdminHome(res, `Purged ${del.deletedCount || 0} archived slot record(s) for ${emails.length} student(s).`);
+  } catch (e) {
+    return errorPage(res, e);
+  }
+});
 
 // ---- Server ----
 let port = process.env.PORT;
