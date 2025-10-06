@@ -841,7 +841,11 @@ app.post("/admin/archive/by-grad-year", async function(req, res) {
       { $set: { isArchived: true, archivedAt: new Date() } }
     );
 
-    return renderAdminHome(res, `Archived ${modifiedCount} student(s) with graduation year ${gradYear}.`);
+    if (modifiedCount === 0) return renderAdminHome(res, `No students were archived for "${group}".`);
+
+    return renderAdminHome(res, `${modifiedCount} student(s) archived for graduation year ${gradYear}.`);
+    
+
   } catch (e) {
     return errorPage(res, e);
   }
@@ -857,8 +861,11 @@ app.post("/admin/archive/group", async function(req, res) {
       { group, isArchived: { $ne: true } },
       { $set: { isArchived: true, archivedAt: new Date() } }
     );
+    
+    if (modifiedCount === 0) return renderAdminHome(res, `No students were archived for "${group}".`);
 
-    return renderAdminHome(res, `Archived ${modifiedCount} student(s) in group "${group}".`);
+    return renderAdminHome(res, `${modifiedCount} student(s) archived in group "${group}".`);
+
   } catch (e) {
     return errorPage(res, e);
   }
