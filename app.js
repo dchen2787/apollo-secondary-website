@@ -135,6 +135,16 @@ function phaseName(n) {
   }
 }
 
+function parseGroupYears(groupStr) {
+  if (!groupStr) return { startYear: null, endYear: null };
+  const m = String(groupStr).match(/(\d{4})\s*[-–]\s*(\d{4})/); // supports 2025-2027 or 2025 – 2027
+  if (!m) return { startYear: null, endYear: null };
+  const startYear = parseInt(m[1], 10);
+  const endYear   = parseInt(m[2], 10);
+  if (Number.isNaN(startYear) || Number.isNaN(endYear)) return { startYear: null, endYear: null };
+  return { startYear, endYear };
+}
+
 function makeLog(type, user, update, slotId){
   const date = new Date();
   if (!slotId || slotId === " ") return;
@@ -378,7 +388,6 @@ function buildAdminAnalytics(allSlots, allStudents, lyteOnly = false) {
   return { studentHours, hoursBySchool };
 }
 
-// Single place to render admin dashboard
 async function renderAdminHome(res, flashMsg = "", lyteOnly = false) {
   try {
     const [slots, confirms, ctrl, students] = await Promise.all([
@@ -388,9 +397,12 @@ async function renderAdminHome(res, flashMsg = "", lyteOnly = false) {
       Student.find({}).lean()
     ]);
 
-    // NEW: split
     const activeStudents   = students.filter(s => !s.isArchived);
     const archivedStudents = students.filter(s =>  s.isArchived);
+
+    // map for quick lookup
+    const activeEmails = new Set(activeStudents.map(s => (s.email || "").toLowerCase()));
+    const confirmsActive = confirms.filter(c => activeEmails.has((c.email || "").toLowerCase()));
 
     const { studentHours: activeHours,   hoursBySchool } = buildAdminAnalytics(slots, activeStudents, lyteOnly);
     const { studentHours: archivedHours }                = buildAdminAnalytics(slots, archivedStudents, lyteOnly);
@@ -400,10 +412,10 @@ async function renderAdminHome(res, flashMsg = "", lyteOnly = false) {
       controls: ctrl,
       maxSlots: effectiveMaxSlots(ctrl),
       allGroups: allGroups.sort(),
-      confirms,
+      confirms: confirmsActive,          // ← only active students
       errM: flashMsg || "",
-      studentHours: activeHours,     // default section = Active
-      archivedStudentHours: archivedHours, // NEW
+      studentHours: activeHours,         // hours list = active only
+      archivedStudentHours: archivedHours,
       hoursBySchool,
       lyteOnly
     });
@@ -809,6 +821,47 @@ app.post("/admin/students/:email/add-slot", async function(req, res) {
     );
     res.redirect(req.get("Referer") || ("/admin/students/" + encodeURIComponent(email)));
   } catch (e) { return errorPage(res, e); }
+});
+
+app.post("/admin/archive/by-grad-year", async function(req, res) {
+  try {
+    const gradYear = parseInt(req.body.gradYear, 10);
+    if (!gradYear) return renderAdminHome(res, "Please provide a valid graduation year.");
+
+    // Fetch only non-archived; parse their group; archive those with endYear === gradYear
+    const candidates = await Student.find({ isArchived: { $ne: true } }).select("email group").lean();
+    const emails = candidates
+      .filter(s => parseGroupYears(s.group).endYear === gradYear)
+      .map(s => (s.email || "").toLowerCase());
+
+    if (!emails.length) return renderAdminHome(res, `No students matched graduation year ${gradYear}.`);
+
+    const { modifiedCount } = await Student.updateMany(
+      { email: { $in: emails } },
+      { $set: { isArchived: true, archivedAt: new Date() } }
+    );
+
+    return renderAdminHome(res, `Archived ${modifiedCount} student(s) with graduation year ${gradYear}.`);
+  } catch (e) {
+    return errorPage(res, e);
+  }
+});
+
+
+app.post("/admin/archive/group", async function(req, res) {
+  try {
+    const group = (req.body.group || "").trim();
+    if (!group) return renderAdminHome(res, "Please provide a group string (e.g., 2025-2027).");
+
+    const { modifiedCount } = await Student.updateMany(
+      { group, isArchived: { $ne: true } },
+      { $set: { isArchived: true, archivedAt: new Date() } }
+    );
+
+    return renderAdminHome(res, `Archived ${modifiedCount} student(s) in group "${group}".`);
+  } catch (e) {
+    return errorPage(res, e);
+  }
 });
 
 // --- Admin: Remove a slot from this student (unclaim) ---
