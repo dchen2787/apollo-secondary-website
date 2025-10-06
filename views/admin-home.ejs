@@ -86,6 +86,20 @@
         <button class="btn" type="submit" style="margin-left:8px;">Search</button>
       </form>
 
+      <!-- Mass archive by exact group -->
+      <form action="/admin/archive/group" method="post" style="margin:8px 0;" 
+            onsubmit="return confirm('Archive all students in this group?');">
+        <input class="input" name="group" placeholder="e.g., 2025-2027" required>
+        <button class="btn">Archive Group</button>
+      </form>
+      
+      <!-- Mass archive by graduation year -->
+      <form action="/admin/archive/by-grad-year" method="post" style="margin:8px 0;" 
+            onsubmit="return confirm('Archive all students graduating in this year?');">
+        <input class="input" name="gradYear" placeholder="e.g., 2027" required>
+        <button class="btn">Archive by Grad Year</button>
+      </form>
+
       <!-- Create Accounts -->
       <section id="sec-accounts" class="cardish">
         <div class="section-head">
