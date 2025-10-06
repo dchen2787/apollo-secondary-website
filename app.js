@@ -580,7 +580,6 @@ app.get("/admin/search", async function(req, res) {
     const qRaw = (req.query.q || "").trim();
     const query = qRaw.toLowerCase();
 
-    // counts for header
     const [totalStudents, totalSlots] = await Promise.all([
       Student.countDocuments({}),
       Slot.countDocuments({})
@@ -596,23 +595,38 @@ app.get("/admin/search", async function(req, res) {
       });
     }
 
-    const tokens = query.split(/\s+/).filter(Boolean);             // e.g., ["john","smith"]
-    const nameRx  = new RegExp(_.escapeRegExp(query), "i");        // whole query regex
-    const tokRxs  = tokens.map(t => new RegExp(_.escapeRegExp(t), "i"));
+    const tokens = query.split(/\s+/).filter(Boolean); // ["john","smith"]
+    const nameRx = new RegExp(_.escapeRegExp(query), "i");
 
-    // fetch candidates (broad net); we’ll score in JS
-    const students = await Student.find({
-      $or: [
-        { email: nameRx },
-        { fName: nameRx },
-        { lName: nameRx }
-      ]
-    }).lean();
+    // Build a broader $or: hits on any token and full-name AND logic too
+    const orClauses = [
+      { email: nameRx },
+      { fName: nameRx },
+      { lName: nameRx }
+    ];
 
-    // pull all slots once to compute totals quickly
+    // Token-based fuzzy
+    tokens.forEach(t => {
+      const rx = new RegExp(_.escapeRegExp(t), "i");
+      orClauses.push({ email: rx }, { fName: rx }, { lName: rx });
+    });
+
+    // Full-name AND (john smith) in order
+    if (tokens.length >= 2) {
+      const fRx = new RegExp(_.escapeRegExp(tokens[0]), "i");
+      const lRx = new RegExp(_.escapeRegExp(tokens[1]), "i");
+      orClauses.push({ $and: [ { fName: fRx }, { lName: lRx } ] });
+
+      // reversed order just in case someone types “smith john”
+      const fRx2 = new RegExp(_.escapeRegExp(tokens[1]), "i");
+      const lRx2 = new RegExp(_.escapeRegExp(tokens[0]), "i");
+      orClauses.push({ $and: [ { fName: fRx2 }, { lName: lRx2 } ] });
+    }
+
+    // Fetch candidates with broad OR; we'll score & sort them
+    const students = await Student.find({ $or: orClauses }).lean();
+
     const slots = await Slot.find({}).lean();
-
-    // bucket slots by student
     const byEmail = new Map();
     slots.forEach(s => {
       const em = (s.studentEmail || "").toLowerCase();
@@ -621,7 +635,6 @@ app.get("/admin/search", async function(req, res) {
       byEmail.get(em).push(s);
     });
 
-    // confirmations
     const confirms = await Confirm.find({}).lean();
     const confirmedMap = new Map(confirms.map(c => [c.email.toLowerCase(), !!c.confirmed]));
 
@@ -633,29 +646,29 @@ app.get("/admin/search", async function(req, res) {
 
       let score = 0;
 
-      // exact matches
-      if (email === query) score += 1000;
-      if (full === query)  score += 900;
+      // exact matches (big boosts)
+      if (email === query) score += 1200;
+      if (full === query)  score += 1100;
 
-      // startsWith boosts
-      if (f.startsWith(tokens[0] || "")) score += 120;
-      if (l.startsWith(tokens[1] || "")) score += 120;
-      if (full.startsWith(query))        score += 180;
+      // token startsWith
+      if (tokens[0] && f.startsWith(tokens[0])) score += 160;
+      if (tokens[1] && l.startsWith(tokens[1])) score += 160;
+      if (full.startsWith(query))              score += 180;
 
       // token presence
       tokens.forEach(t => {
-        if (f.includes(t)) score += 30;
-        if (l.includes(t)) score += 30;
-        if (email.includes(t)) score += 40;
-        if (full.includes(t))  score += 35;
+        if (f.includes(t)) score += 40;
+        if (l.includes(t)) score += 40;
+        if (email.includes(t)) score += 60;
+        if (full.includes(t))  score += 45;
       });
 
       // generic contains
-      if (full.includes(query))  score += 60;
-      if (email.includes(query)) score += 80;
+      if (full.includes(query))  score += 70;
+      if (email.includes(query)) score += 90;
 
-      // prefer active over archived when otherwise equal
-      if (!st.isArchived) score += 5;
+      // prefer active
+      if (!st.isArchived) score += 10;
 
       return score;
     }
@@ -663,8 +676,6 @@ app.get("/admin/search", async function(req, res) {
     const studentResultsScored = students.map(st => {
       const email = (st.email || "").toLowerCase();
       const mine = byEmail.get(email) || [];
-
-      // total hours
       const totalHours = mine.reduce((sum, s) => sum + slotHours(s), 0);
 
       return {
@@ -683,7 +694,6 @@ app.get("/admin/search", async function(req, res) {
       };
     });
 
-    // sort by score desc, then by hours, then slots, then name
     const studentResults = studentResultsScored
       .sort((a, b) =>
         (b._score - a._score) ||
@@ -691,9 +701,9 @@ app.get("/admin/search", async function(req, res) {
         (b.totalSlots - a.totalSlots) ||
         a.name.localeCompare(b.name)
       )
-      .map(({ _score, ...rest }) => rest); // strip score before rendering
+      .map(({ _score, ...rest }) => rest);
 
-    // Physician/slot search (basic contains; could be ranked similarly if needed)
+    // Physician/slot search stays the same
     const physMatches = slots.filter(s => {
       const hay = [
         s.physName, s.physSpecialty, s.location,
@@ -725,7 +735,6 @@ app.get("/admin/search", async function(req, res) {
     return errorPage(res, e);
   }
 });
-
 
 // --- Admin: Student Detail ---
 app.get("/admin/students/:email", async function(req, res) {
