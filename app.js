@@ -1063,30 +1063,71 @@ app.post("/admin/archived-slots/:id/delete", async function(req, res) {
 });
 
 
-// Activate account
-app.post("/activate-account", function(req,res){
-  const email = _.toLower(req.body.email);
-  const password = req.body.password;
+// Activate account with detailed error handling
+app.post("/activate-account", async function(req, res) {
+  try {
+    const email = _.toLower(req.body.email || "").trim();
+    const password = req.body.password || "";
+    const fName = _.startCase(req.body.fName || "");
+    const lName = _.startCase(req.body.lName || "");
 
-  Student.findOne({email}, function(err, foundUser){
-    if(err) return res.render("activate-account", {errM:"An error occured. Please try again or contact apolloyimde@gmail.com."});
-    if (!foundUser) return res.render("activate-account", {errM:"Email not found. Please use the login information sent to you or contact apolloyimde@gmail.com."});
-    if (foundUser.fName) return res.render("activate-account", {errM:"An account with this email has already been activated. Please use the login page or contact apolloyimde@gmail.com."});
+    if (!email || !password) {
+      return res.render("activate-account", {
+        errM: "Please enter both email and password before continuing.",
+        errM2: ""
+      });
+    }
 
-    bcrypt.compare(password,foundUser.password, function(err, ok){
-      if(err || !ok) return res.render("activate-account", {errM:"Incorrect password. Please use the login information sent to you or contact apolloyimde@gmail.com."});
+    const foundUser = await Student.findOne({ email });
+    if (!foundUser) {
+      return res.render("activate-account", {
+        errM: "This email is not registered yet. Please wait for an admin to create your account or contact apolloyimde@gmail.com.",
+        errM2: ""
+      });
+    }
 
-      Student.updateOne(
-        {email},
-        {fName:_.startCase(req.body.fName), lName:_.startCase(req.body.lName)},
-        async function(err){
-          if(err) return res.render("activate-account", {errM:"An error occured. Please try again or contact apolloyimde@gmail.com."});
-          return renderHome(res, email, "Account activated!");
-        }
-      );
+    // If account already activated (has first name)
+    if (foundUser.fName && foundUser.lName) {
+      return res.render("activate-account", {
+        errM: "This account has already been activated. Please use the Login page.",
+        errM2: ""
+      });
+    }
+
+    // Archived accounts cannot be reactivated
+    if (foundUser.isArchived) {
+      return res.render("activate-account", {
+        errM: "This account has been archived and cannot be activated. Please contact apolloyimde@gmail.com for help.",
+        errM2: ""
+      });
+    }
+
+    // Compare passwords
+    const ok = await bcrypt.compare(password, foundUser.password);
+    if (!ok) {
+      return res.render("activate-account", {
+        errM: "Incorrect password. Please check the activation email or contact apolloyimde@gmail.com for assistance.",
+        errM2: ""
+      });
+    }
+
+    // All good — activate account
+    await Student.updateOne(
+      { email },
+      { $set: { fName, lName } }
+    );
+
+    console.log(`[activate] Account activated for ${email}`);
+    return renderHome(res, email, "Your account has been successfully activated!");
+  } catch (err) {
+    console.error("Activation error:", err);
+    return res.render("activate-account", {
+      errM: "An unexpected error occurred while activating your account. Please try again or contact apolloyimde@gmail.com.",
+      errM2: ""
     });
-  });
+  }
 });
+
 
 // Student login
 app.post("/login", function(req,res){
