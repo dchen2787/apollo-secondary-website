@@ -2,26 +2,42 @@
 
 <style>
   .wrap { max-width: 1100px; margin: 0 auto; padding: 24px 16px 64px; }
-  .topline { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom: 16px; }
+  .topline { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:16px; }
   .back { color:#111827; }
-  h1 { margin: 6px 0 8px; font-weight:800; }
+  h1 { margin:6px 0 8px; font-weight:800; }
   .muted { color:#6b7280; }
 
+  /* Search bar */
+  .suggest-wrap { position: relative; width:100%; max-width: 900px; }
   .searchbar-wrap {
-    display:flex; gap:8px; flex-wrap:wrap; align-items:center; 
-    background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:10px; 
-    box-shadow:0 8px 24px rgba(0,0,0,.05);
-    margin-bottom: 16px;
+    display:flex; gap:8px; align-items:center; flex-wrap:nowrap;
+    background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:10px;
+    box-shadow:0 8px 24px rgba(0,0,0,.05); margin-bottom:16px;
+    width:100%;
   }
-  .searchbar-wrap input[type="text"] {
-    flex:1;
-    border:1px solid #e5e7eb; border-radius:10px; padding:10px 12px; min-width: 240px;
+  .searchbar-wrap input[type="text"]{
+    flex:1; min-width: 0;  /* allow shrink on small screens */
+    border:1px solid #e5e7eb; border-radius:10px; padding:10px 12px;
   }
+
+  /* Suggest dropdown */
+  .suggest-list {
+    position:absolute; top:100%; left:0; right:0; z-index: 1000;
+    background:#fff; border:1px solid #e5e7eb; border-radius:10px;
+    box-shadow:0 12px 28px rgba(0,0,0,.08); margin-top:6px; overflow:hidden;
+  }
+  .suggest-item {
+    padding:10px 12px; cursor:pointer; display:flex; justify-content:space-between; gap:10px;
+  }
+  .suggest-item:hover, .suggest-item.is-active { background:#f3f4f6; }
+  .suggest-sub { color:#6b7280; font-size:12px; }
+  .pill-arch { background:#fee2e2; color:#991b1b; border-radius:999px; padding:2px 8px; font-size:12px; }
+
   .btn { border:none; border-radius:10px; padding:10px 14px; font-weight:700; }
   .btn-primary { background:#111827; color:#fff; }
 
-  .section { margin-top: 24px; }
-  .section h2 { margin: 0 0 8px; font-size: 20px; font-weight: 700; }
+  .section { margin-top:24px; }
+  .section h2 { margin:0 0 8px; font-size:20px; font-weight:700; }
   .card {
     background:#fff; border:1px solid #e5e7eb; border-radius:14px; padding:14px;
     box-shadow:0 6px 18px rgba(0,0,0,.05); margin-bottom:12px;
@@ -33,16 +49,17 @@
   .pill-confirm { background:#ecfdf5; color:#065f46; }
   .pill-lock { background:#fff7ed; color:#9a3412; }
 
-  .grid2 { display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
-  @media (max-width: 800px){ .grid2 { grid-template-columns: 1fr; } }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  @media (max-width: 800px){ .grid2 { grid-template-columns:1fr; } }
 
   .kv { display:flex; gap:6px; }
-  .kv b { min-width: 120px; }
+  .kv b { min-width:120px; }
 
   .slot-list .slot-item { border-top:1px dashed #e5e7eb; padding-top:10px; margin-top:10px; }
   .tag { display:inline-block; background:#dbeafe; color:#1e3a8a; border-radius:999px; padding:2px 10px; font-size:12px; margin-left:6px; }
   .tag-nonpcp { background:#fef3c7; color:#92400e; }
 </style>
+
 
 <div class="wrap">
   <div class="topline">
@@ -50,87 +67,92 @@
     <span class="muted">|</span>
     <span class="muted">Search across students & physicians</span>
   </div>
-
-  <h1>Admin Search</h1>
-  <form class="searchbar-wrap" action="/admin/search" method="get">
-    <input type="text" name="q" value="<%= query %>" placeholder="Type student name/email or physician name…" autofocus>
-    <button class="btn btn-primary" type="submit">Search</button>
-  </form>
-  <div class="muted">
-    Dataset: <%= totalStudents %> students, <%= totalSlots %> slots.
-    <% if (!query || !query.trim()) { %> Enter a search term to get started. <% } %>
+  
+   <h1>Admin Search</h1>
+  
+  <div class="suggest-wrap">
+    <form class="searchbar-wrap" action="/admin/search" method="get" autocomplete="off">
+      <input id="adminSearch" type="text" name="q" value="<%= query %>" placeholder="Type name, email, physician… or grad year (e.g., 2027)" autofocus>
+      <button class="btn btn-primary" type="submit">Search</button>
+    </form>
+    <div id="suggestBox" class="suggest-list" style="display:none;"></div>
   </div>
-
-  <% if (query && query.trim()) { %>
-    <!-- Students -->
-    <div class="section">
-      <h2>Student matches (<%= studentResults.length %>)</h2>
-      <% if (studentResults.length === 0) { %>
-        <div class="muted">No students matched "<%= query %>".</div>
-      <% } %>
-
-      <% studentResults.forEach(function(s){ %>
-        <div class="card">
-          <div class="student-head">
-            <div>
-              <div style="font-size:18px; font-weight:700;">
-                <a href="/admin/students/<%= encodeURIComponent(s.email) %>">
-                  <%= s.name %>
-                </a>
-                <span class="muted">(<%= s.email %>)</span>
-                <% if (s.isLyte) { %><span class="pill pill-lyte">LYTE</span><% } %>
-                <% if (s.confirmed) { %><span class="pill pill-confirm">Confirmed</span><% } %>
-                <% if (s.matchingLocked) { %><span class="pill pill-lock">Matching Locked</span><% } %>
-              </div>
-              <div class="muted" style="margin-top:2px;">
-                <%= s.school || "(No school)" %> • Group: <%= s.group || "-" %>
-              </div>
-            </div>
-            <div class="muted">
-              <b><%= s.totalHours.toFixed(2) %> hrs</b> • <b><%= s.totalSlots %></b> slot(s)
-              <!-- ✅ Archive/Unarchive buttons (ADD THIS) -->
-                  <div style="margin-top:6px;">
-                    <% if (s.isArchived) { %>
-                      <form action="/admin/students/<%= encodeURIComponent(s.email) %>/unarchive" method="post" style="display:inline;">
-                        <button class="btn" style="padding:6px 10px;">Unarchive</button>
-                      </form>
-                    <% } else { %>
-                      <form action="/admin/students/<%= encodeURIComponent(s.email) %>/archive" method="post" style="display:inline;">
-                        <button class="btn" style="padding:6px 10px; background:#b91c1c;">Archive</button>
-                      </form>
-                    <% } %>
-                  </div>
-            </div>
+  
+  <script>
+  (function(){
+    const input = document.getElementById('adminSearch');
+    const box = document.getElementById('suggestBox');
+    let t=null, sel=-1, items=[];
+  
+    function hide(){ box.style.display='none'; sel=-1; items=[]; box.innerHTML=''; }
+    function show(){ if(items.length){ box.style.display='block'; } }
+  
+    async function fetchSuggest(q){
+      const r = await fetch('/admin/search/suggest?q=' + encodeURIComponent(q), { headers: { 'Accept': 'application/json' }});
+      const data = await r.json();
+      if (!data.ok) throw new Error(data.error||'suggest failed');
+      return data.suggestions || [];
+    }
+  
+    function render(list){
+      items = list;
+      if (!items.length) { hide(); return; }
+      box.innerHTML = items.map((it,i)=>`
+        <div class="suggest-item" data-idx="${i}">
+          <div>
+            <div>${it.label}</div>
+            <div class="suggest-sub">${it.subtitle || ''}</div>
           </div>
-
-          <% if (s.slots.length) { %>
-            <div class="slot-list" style="margin-top:10px;">
-              <% s.slots.forEach(function(sl){ 
-                   const isPCP = ['Family Medicine (PCP)','Primary Care'].includes((sl.physSpecialty||'').trim());
-              %>
-                <div class="slot-item">
-                  <div>
-                    <b><%= sl.physName || '—' %></b>
-                    <% if (sl.physSpecialty) { %>
-                      <span class="tag"><%= sl.physSpecialty %></span>
-                      <% if (!isPCP) { %><span class="tag tag-nonpcp">Non‑PCP</span><% } %>
-                    <% } %>
-                  </div>
-                  <div class="muted">
-                    <%= sl.dDate || '-' %> • <%= sl.timeStart || '-' %> to <%= sl.timeEnd || '-' %> • <%= sl.location || '-' %>
-                  </div>
-                  <% if (sl.notes && sl.notes.trim()) { %>
-                    <div class="muted"><em>Notes:</em> <%= sl.notes %></div>
-                  <% } %>
-                </div>
-              <% }) %>
-            </div>
-          <% } else { %>
-            <div class="muted" style="margin-top:8px;">No claimed slots.</div>
-          <% } %>
+          ${it.isArchived ? '<span class="pill-arch">Archived</span>' : ''}
         </div>
-      <% }) %>
-    </div>
+      `).join('');
+      show();
+    }
+  
+    box.addEventListener('mousedown', function(e){
+      const el = e.target.closest('.suggest-item');
+      if (!el) return;
+      const idx = Number(el.getAttribute('data-idx'));
+      const it = items[idx];
+      if (!it) return;
+      // navigate directly to student detail on click
+      window.location.href = '/admin/students/' + encodeURIComponent(it.email);
+    });
+  
+    input.addEventListener('input', function(){
+      const q = (input.value || '').trim();
+      clearTimeout(t);
+      if (!q) { hide(); return; }
+      t = setTimeout(async ()=>{
+        try { render(await fetchSuggest(q)); }
+        catch { hide(); }
+      }, 150);
+    });
+  
+    // keyboard nav
+    input.addEventListener('keydown', function(e){
+      if (box.style.display === 'none') return;
+      if (e.key === 'ArrowDown') { e.preventDefault(); sel = Math.min(sel+1, items.length-1); highlight(); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); sel = Math.max(sel-1, 0); highlight(); }
+      else if (e.key === 'Enter') {
+        if (sel >= 0 && items[sel]) {
+          e.preventDefault();
+          window.location.href = '/admin/students/' + encodeURIComponent(items[sel].email);
+        }
+      } else if (e.key === 'Escape') { hide(); }
+    });
+  
+    function highlight(){
+      Array.from(box.children).forEach((c,i)=> c.style.background = (i===sel ? '#f3f4f6' : ''));
+    }
+  
+    // close on click outside
+    document.addEventListener('click', (e)=> {
+      if (!box.contains(e.target) && e.target !== input) hide();
+    });
+  })();
+  </script>
+
 
 
     <!-- Physicians -->
