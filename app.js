@@ -573,8 +573,7 @@ app.get("/activate-account", function(req,res){
 
 
 
-// --- Admin Search ---
-// --- Admin Search (ranked + full-name aware) ---
+// --- Admin Search (ranked + full-name aware + grad-year) ---
 app.get("/admin/search", async function(req, res) {
   try {
     const qRaw = (req.query.q || "").trim();
@@ -595,38 +594,47 @@ app.get("/admin/search", async function(req, res) {
       });
     }
 
-    const tokens = query.split(/\s+/).filter(Boolean); // ["john","smith"]
+    const tokens = query.split(/\s+/).filter(Boolean);
     const nameRx = new RegExp(_.escapeRegExp(query), "i");
 
-    // Build a broader $or: hits on any token and full-name AND logic too
     const orClauses = [
       { email: nameRx },
       { fName: nameRx },
       { lName: nameRx }
     ];
-
-    // Token-based fuzzy
     tokens.forEach(t => {
       const rx = new RegExp(_.escapeRegExp(t), "i");
       orClauses.push({ email: rx }, { fName: rx }, { lName: rx });
     });
-
-    // Full-name AND (john smith) in order
     if (tokens.length >= 2) {
       const fRx = new RegExp(_.escapeRegExp(tokens[0]), "i");
       const lRx = new RegExp(_.escapeRegExp(tokens[1]), "i");
-      orClauses.push({ $and: [ { fName: fRx }, { lName: lRx } ] });
-
-      // reversed order just in case someone types “smith john”
       const fRx2 = new RegExp(_.escapeRegExp(tokens[1]), "i");
       const lRx2 = new RegExp(_.escapeRegExp(tokens[0]), "i");
+      orClauses.push({ $and: [ { fName: fRx }, { lName: lRx } ] });
       orClauses.push({ $and: [ { fName: fRx2 }, { lName: lRx2 } ] });
     }
 
-    // Fetch candidates with broad OR; we'll score & sort them
-    const students = await Student.find({ $or: orClauses }).lean();
+    // Pull candidates by name/email first
+    let students = await Student.find({ $or: orClauses }).lean();
+
+    // If query looks like a grad year, include those students too
+    const yearMatch = query.match(/^\d{4}$/);
+    if (yearMatch) {
+      const gradYear = parseInt(yearMatch[0], 10);
+      const byId = new Map(students.map(s => [String(s._id), s]));
+      const all = await Student.find({}).lean();
+      all.forEach(s => {
+        const { endYear } = parseGroupYears(s.group);
+        if (endYear === gradYear && !byId.has(String(s._id))) {
+          byId.set(String(s._id), s);
+        }
+      });
+      students = Array.from(byId.values());
+    }
 
     const slots = await Slot.find({}).lean();
+
     const byEmail = new Map();
     slots.forEach(s => {
       const em = (s.studentEmail || "").toLowerCase();
@@ -643,33 +651,28 @@ app.get("/admin/search", async function(req, res) {
       const f = (st.fName || "").toLowerCase();
       const l = (st.lName || "").toLowerCase();
       const full = (f && l) ? (f + " " + l) : (f || l);
-
       let score = 0;
-
-      // exact matches (big boosts)
       if (email === query) score += 1200;
       if (full === query)  score += 1100;
-
-      // token startsWith
       if (tokens[0] && f.startsWith(tokens[0])) score += 160;
       if (tokens[1] && l.startsWith(tokens[1])) score += 160;
-      if (full.startsWith(query))              score += 180;
-
-      // token presence
+      if (full.startsWith(query)) score += 180;
       tokens.forEach(t => {
         if (f.includes(t)) score += 40;
         if (l.includes(t)) score += 40;
         if (email.includes(t)) score += 60;
         if (full.includes(t))  score += 45;
       });
-
-      // generic contains
       if (full.includes(query))  score += 70;
       if (email.includes(query)) score += 90;
-
-      // prefer active
       if (!st.isArchived) score += 10;
-
+      // slight boost if grad-year matches for year queries
+      const ym = query.match(/^\d{4}$/);
+      if (ym) {
+        const gy = parseInt(ym[0], 10);
+        const { endYear } = parseGroupYears(st.group);
+        if (endYear === gy) score += 150;
+      }
       return score;
     }
 
@@ -677,7 +680,6 @@ app.get("/admin/search", async function(req, res) {
       const email = (st.email || "").toLowerCase();
       const mine = byEmail.get(email) || [];
       const totalHours = mine.reduce((sum, s) => sum + slotHours(s), 0);
-
       return {
         _score: scoreStudent(st),
         name: [st.fName, st.lName].filter(Boolean).join(" ") || st.email,
@@ -703,11 +705,10 @@ app.get("/admin/search", async function(req, res) {
       )
       .map(({ _score, ...rest }) => rest);
 
-    // Physician/slot search stays the same
+    // Physician/slot search unchanged
     const physMatches = slots.filter(s => {
       const hay = [
-        s.physName, s.physSpecialty, s.location,
-        s.notes, s.dDate, s.timeStart, s.timeEnd
+        s.physName, s.physSpecialty, s.location, s.notes, s.dDate, s.timeStart, s.timeEnd
       ].filter(Boolean).join(" ").toLowerCase();
       return hay.includes(query);
     });
@@ -775,6 +776,90 @@ app.get("/admin/students/:email", async function(req, res) {
   } catch (e) { return errorPage(res, e); }
 });
 
+// --- Admin search suggestions (names/emails + grad-year) ---
+app.get("/admin/search/suggest", async function(req, res) {
+  try {
+    const qRaw = (req.query.q || "").trim();
+    const q = qRaw.toLowerCase();
+    if (!q) return res.json({ ok: true, suggestions: [] });
+
+    const tokens = q.split(/\s+/).filter(Boolean);
+    const nameRx = new RegExp(_.escapeRegExp(q), "i");
+    const orClauses = [
+      { email: nameRx }, { fName: nameRx }, { lName: nameRx }
+    ];
+    tokens.forEach(t => {
+      const rx = new RegExp(_.escapeRegExp(t), "i");
+      orClauses.push({ email: rx }, { fName: rx }, { lName: rx });
+    });
+    if (tokens.length >= 2) {
+      const fRx = new RegExp(_.escapeRegExp(tokens[0]), "i");
+      const lRx = new RegExp(_.escapeRegExp(tokens[1]), "i");
+      const fRx2 = new RegExp(_.escapeRegExp(tokens[1]), "i");
+      const lRx2 = new RegExp(_.escapeRegExp(tokens[0]), "i");
+      orClauses.push({ $and: [ { fName: fRx }, { lName: lRx } ] });
+      orClauses.push({ $and: [ { fName: fRx2 }, { lName: lRx2 } ] });
+    }
+
+    let students = await Student.find({ $or: orClauses })
+      .select("fName lName email group isArchived")
+      .limit(100)
+      .lean();
+
+    // Add grad year matches if q is YYYY
+    const ym = q.match(/^\d{4}$/);
+    if (ym) {
+      const gy = parseInt(ym[0], 10);
+      const byId = new Map(students.map(s => [String(s._id), s]));
+      const all = await Student.find({})
+        .select("fName lName email group isArchived")
+        .lean();
+      all.forEach(s => {
+        const { endYear } = parseGroupYears(s.group);
+        if (endYear === gy && !byId.has(String(s._id))) byId.set(String(s._id), s);
+      });
+      students = Array.from(byId.values());
+    }
+
+    function score(st) {
+      const email = (st.email || "").toLowerCase();
+      const f = (st.fName || "").toLowerCase();
+      const l = (st.lName || "").toLowerCase();
+      const full = (f && l) ? (f + " " + l) : (f || l);
+      let s = 0;
+      if (email === q) s += 1000;
+      if (full === q)  s += 900;
+      if (full.startsWith(q)) s += 150;
+      tokens.forEach(t => {
+        if (f.startsWith(t)) s += 60;
+        if (l.startsWith(t)) s += 60;
+        if (email.includes(t)) s += 60;
+      });
+      if (!st.isArchived) s += 5;
+      if (ym) {
+        const { endYear } = parseGroupYears(st.group);
+        if (endYear === parseInt(ym[0],10)) s += 120;
+      }
+      return s;
+    }
+
+    const suggestions = students
+      .map(st => ({
+        _score: score(st),
+        label: [st.fName, st.lName].filter(Boolean).join(" ") || st.email,
+        subtitle: (st.group ? `Group ${st.group}` : ""),
+        email: st.email,
+        isArchived: !!st.isArchived
+      }))
+      .sort((a,b)=> b._score - a._score)
+      .slice(0, 8)
+      .map(({_score, ...rest}) => rest);
+
+    return res.json({ ok: true, suggestions });
+  } catch (e) {
+    return res.status(500).json({ ok: false, error: e?.message || String(e) });
+  }
+});
 
 
 // --- Admin: Update basic fields (name, school, group, isLyte, archive toggle) ---
