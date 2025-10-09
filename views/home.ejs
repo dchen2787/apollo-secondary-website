@@ -391,4 +391,225 @@
   $(function () { $('#specDropdown').dropdown(); });
 </script>
 
+<!-- ========================= -->
+<!-- Extra Animations Pack -->
+<!-- ========================= -->
+
+<style>
+  :root{
+    --anim-fast: 180ms;
+    --anim-med: 340ms;
+    --anim-slow: 700ms;
+    --spring: cubic-bezier(.2,.9,.2,1);
+  }
+
+  /* Respect reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+
+  /* Keyframes */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes softPop {
+    0%   { transform: scale(.96); opacity:0; }
+    60%  { transform: scale(1.02); opacity:1; }
+    100% { transform: scale(1); }
+  }
+  @keyframes floatY {
+    0%,100% { transform: translateY(0); }
+    50%     { transform: translateY(-4px); }
+  }
+  @keyframes shimmer {
+    0%   { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+  @keyframes dropIn {
+    0%   { opacity:0; transform: translateY(-8px) scale(.98); }
+    100% { opacity:1; transform: translateY(0) scale(1); }
+  }
+
+  /* Page hero entrance */
+  .page-hero {
+    animation: fadeUp var(--anim-med) var(--spring) both;
+  }
+  .avatar {
+    animation: softPop var(--anim-med) var(--spring) both, floatY 4s ease-in-out infinite;
+  }
+
+  /* Alerts shimmer on first paint (subtle) */
+  .alert.alert-success.alert-sticky {
+    position: relative;
+    overflow: hidden;
+  }
+  .alert.alert-success.alert-sticky::after{
+    content:"";
+    position:absolute; inset:0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.35), transparent);
+    background-size: 200% 100%;
+    animation: shimmer 2.2s ease 1;
+    pointer-events:none;
+  }
+
+  /* Section blocks entrance */
+  .section-block {
+    transform-origin: top center;
+    animation: softPop var(--anim-med) var(--spring) both;
+  }
+  .section-block + .section-block {
+    animation-delay: 120ms;
+  }
+
+  /* Filter card spring + focus glow */
+  .filter-card {
+    transition: transform var(--anim-med) var(--spring), box-shadow var(--anim-med);
+  }
+  .filter-card:focus-within {
+    transform: translateY(-1px);
+    box-shadow: 0 12px 30px rgba(0,0,0,.08);
+  }
+
+  /* Dropdown pop */
+  .dropdown-menu {
+    transform-origin: 20% top;
+    animation: dropIn var(--anim-fast) var(--spring) both;
+  }
+
+  /* Slot card reveal + hover */
+  .slot-card {
+    transform: translateY(6px);
+    opacity: 0;
+    will-change: transform, opacity, box-shadow;
+  }
+  .slot-card.reveal {
+    animation: fadeUp var(--anim-med) var(--spring) both;
+  }
+  .slot-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 24px rgba(0,0,0,.09);
+    transition: box-shadow var(--anim-med), transform var(--anim-med);
+  }
+
+  /* Badges shimmer on hover (micro) */
+  .badge-soft {
+    background-image: linear-gradient(90deg, #dbeafe, #eaf2ff, #dbeafe);
+    background-size: 200% 100%;
+    transition: filter var(--anim-fast), transform var(--anim-fast);
+  }
+  .slot-card:hover .badge-soft {
+    animation: shimmer 1.2s linear infinite;
+    filter: saturate(1.15);
+  }
+
+  /* Buttons: gentle lift + ripple */
+  .btn-soft, .btn-ghost {
+    position: relative;
+    overflow: hidden;
+    transform: translateZ(0);
+    transition: transform var(--anim-fast), box-shadow var(--anim-fast);
+  }
+  .btn-soft:hover, .btn-ghost:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(0,0,0,.08);
+  }
+  .btn-ripple {
+    position:absolute; border-radius:50%;
+    transform: translate(-50%, -50%);
+    pointer-events:none; width:10px; height:10px; opacity:.25;
+    background: currentColor;
+    animation: ripple 600ms ease-out forwards;
+  }
+  @keyframes ripple {
+    from { transform: translate(-50%,-50%) scale(1); opacity:.3; }
+    to   { transform: translate(-50%,-50%) scale(18); opacity:0; }
+  }
+
+  /* Confirm button pulse (only if visible) */
+  form[action="/confirm"] .btn-soft {
+    box-shadow: 0 8px 20px rgba(17,24,39,.15);
+    animation: pulseGlow 2.2s ease-in-out infinite;
+  }
+  @keyframes pulseGlow {
+    0%,100% { box-shadow: 0 8px 20px rgba(17,24,39,.12); }
+    50%     { box-shadow: 0 12px 28px rgba(17,24,39,.22); }
+  }
+
+  /* Fancy focus ring (keyboard users) */
+  .searchbar:focus, .dropdown-toggle:focus, .btn-soft:focus, .btn-ghost:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(59,130,246,.25);
+  }
+
+  /* Lift filters above list (in case) */
+  .section-block.browse, .filter-card { position: relative; z-index: 20; }
+  #slotList, .slot-card { position: relative; z-index: 1; }
+  .dropdown-menu { z-index: 2000; }
+</style>
+
+<script>
+  (function(){
+    // Stagger reveal for slot cards on load & on filter changes
+    const list = document.getElementById('slotList');
+    const cards = list ? Array.from(list.querySelectorAll('.slot-card')) : [];
+
+    function revealStagger(targetCards) {
+      let delay = 0;
+      targetCards.forEach(card => {
+        card.classList.remove('reveal');
+        card.style.animationDelay = '0ms';
+      });
+      targetCards.filter(c => c.style.display !== 'none').slice(0, 30).forEach((card, i) => {
+        delay = 30 * i;
+        card.style.animationDelay = delay + 'ms';
+        card.classList.add('reveal');
+      });
+    }
+
+    // On initial load
+    revealStagger(cards);
+
+    // Hook into existing filter apply (monkey-patch)
+    const applyFilters = () => {
+      // Try to find your existing filter function context
+      // We just trigger a stagger on visible cards.
+      const visible = cards.filter(c => c.style.display !== 'none');
+      revealStagger(visible);
+    };
+
+    // Observe changes to #slotList (when filtering hides/shows)
+    if ('MutationObserver' in window && list) {
+      const mo = new MutationObserver(() => applyFilters());
+      mo.observe(list, { attributes: true, subtree: true, attributeFilter: ['style','class'] });
+    }
+
+    // Button ripple effect
+    function addRipple(e){
+      const btn = e.currentTarget;
+      const rect = btn.getBoundingClientRect();
+      const ripple = document.createElement('span');
+      ripple.className = 'btn-ripple';
+      ripple.style.left = (e.clientX - rect.left) + 'px';
+      ripple.style.top  = (e.clientY - rect.top)  + 'px';
+      btn.appendChild(ripple);
+      setTimeout(() => ripple.remove(), 650);
+    }
+    document.querySelectorAll('.btn-soft, .btn-ghost').forEach(b => {
+      b.addEventListener('click', addRipple);
+    });
+
+    // Smooth scroll to filters when user focuses search
+    const search = document.getElementById('search');
+    if (search) {
+      search.addEventListener('focus', () => {
+        const wrap = document.querySelector('.section-block.browse');
+        if (!wrap) return;
+        const y = wrap.getBoundingClientRect().top + window.pageYOffset - 12;
+        window.scrollTo({ top: y, behavior: 'smooth' });
+      });
+    }
+  })();
+</script>
+
 <%- include("./partials/footer"); -%>
