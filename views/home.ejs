@@ -14,6 +14,14 @@
   .slot-card .head { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
   .muted { color:#6b7280; }
 
+  /* --- Fix dropdown appearing behind slot cards --- */
+  .section-block.browse,
+  .filter-card { position: relative; z-index: 20; }   /* lift filters above the list */
+  #slotList { position: relative; z-index: 1; }       /* keep cards underneath */
+  .slot-card { position: relative; z-index: 1; }      /* ensure no stray higher z-index */
+  
+  .dropdown-menu { z-index: 2000; }                   /* stronger than everything else */
+
   .btn-soft { background:#111827; color:#fff; border:none; border-radius:12px; padding:8px 14px; }
   .btn-soft[disabled] { opacity:.55; cursor:not-allowed; }
   .btn-ghost { background:#f3f4f6; border:none; border-radius:12px; padding:8px 14px; }
