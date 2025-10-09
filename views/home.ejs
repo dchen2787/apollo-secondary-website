@@ -14,6 +14,14 @@
   .slot-card .head { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
   .muted { color:#6b7280; }
 
+  /* --- Fix dropdown appearing behind slot cards --- */
+  .section-block.browse,
+  .filter-card { position: relative; z-index: 20; }   /* lift filters above the list */
+  #slotList { position: relative; z-index: 1; }       /* keep cards underneath */
+  .slot-card { position: relative; z-index: 1; }      /* ensure no stray higher z-index */
+  
+  .dropdown-menu { z-index: 2000; }                   /* stronger than everything else */
+
   .btn-soft { background:#111827; color:#fff; border:none; border-radius:12px; padding:8px 14px; }
   .btn-soft[disabled] { opacity:.55; cursor:not-allowed; }
   .btn-ghost { background:#f3f4f6; border:none; border-radius:12px; padding:8px 14px; }
@@ -54,15 +62,50 @@
     padding-bottom: 6px;
   }
 
-  /* Filters */
-  .filter-card { background:#ffffff; border:1px solid #e5e7eb; border-radius:16px; padding:16px; box-shadow:0 6px 16px rgba(0,0,0,.05); margin:14px 0 18px; }
-  .controls { display:grid; grid-template-columns: minmax(320px, 560px) minmax(240px, 320px) auto; gap:14px; align-items:center; }
-  .searchbar-wrap { position:relative; display:flex; align-items:center; gap:10px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:14px; padding:10px 12px; }
+  /* ===== Animated Search & Filters ===== */
+  .filter-card {
+    background:#ffffff; border:1px solid #e5e7eb; border-radius:16px; padding:16px;
+    box-shadow:0 10px 28px rgba(0,0,0,.06); margin:14px 0 18px;
+    animation: cardPop .35s ease both;
+  }
+  @keyframes cardPop { from{ transform: translateY(6px) scale(.98); opacity:0; } to{ transform: translateY(0) scale(1); opacity:1; } }
+
+  .controls {
+    display:grid;
+    grid-template-columns: minmax(320px, 560px) minmax(240px, 320px) auto;
+    gap:14px; align-items:center;
+  }
+
+  .searchbar-wrap {
+    position:relative; display:flex; align-items:center; gap:10px;
+    background:#f9fafb; border:1px solid #e5e7eb; border-radius:14px; padding:10px 12px;
+    transition: box-shadow .2s ease, transform .15s ease;
+  }
+  .searchbar-wrap:focus-within { box-shadow:0 12px 32px rgba(17,24,39,.12); transform: translateY(-1px); }
+  .searchbar-wrap .icon { width:18px; height:18px; opacity:.6; }
   .searchbar { flex:1; border:0; background:transparent; outline:none; padding:6px 2px; font-size:16px; }
+
   .dropdown { position:relative; width:100%; }
-  .dropdown-toggle { width:100%; text-align:left; background:#f9fafb; border:1px solid #e5e7eb; border-radius:12px; padding:10px 14px; }
-  .dropdown-menu { width:100%; max-height:260px; overflow:auto; border-radius:12px; border:1px solid #e5e7eb; box-shadow:0 8px 24px rgba(0,0,0,.1); }
-  label.checkbox { display:flex; align-items:center; gap:8px; }
+  .dropdown-toggle {
+    width:100%; text-align:left; background:#f9fafb; border:1px solid #e5e7eb; border-radius:12px;
+    padding:10px 14px; transition: box-shadow .2s ease, transform .15s ease;
+  }
+  .dropdown-toggle:focus { outline:none; box-shadow:0 12px 32px rgba(17,24,39,.12); transform: translateY(-1px); }
+  .dropdown-menu {
+    width:100%; max-height:260px; overflow:auto;
+    border-radius:12px; border:1px solid #e5e7eb; box-shadow:0 16px 36px rgba(0,0,0,.1);
+    animation: menuFade .15s ease both;
+  }
+  @keyframes menuFade { from{opacity:0; transform: translateY(-4px);} to{opacity:1; transform:none;} }
+
+  .pill-filter {
+    display:inline-flex; align-items:center; gap:8px; padding:6px 10px; font-size:12px;
+    background:#eef2ff; color:#1e40af; border-radius:999px; margin-top:6px; transition: background .15s;
+  }
+  .pill-filter.off { background:#f3f4f6; color:#374151; }
+
+  #slotList .slot-card { animation: slotIn .25s ease both; }
+  @keyframes slotIn { from{opacity:0; transform: translateY(8px);} to{opacity:1; transform:none;} }
 </style>
 
 <div class="container">
@@ -71,8 +114,7 @@
     const matchingLocked = !!(controls && controls.matchingLocked);
     const pcpOnlyFlag   = !!(controls && controls.PCPonly);
     const maxAllowed    = (typeof maxSlots === 'number' ? maxSlots : 9999);
-    const userEmailLC = ((user && user.email) || "").toLowerCase();
-    const mySlotsAll  = (slots || []).filter(s => ((s.studentEmail || "").toLowerCase() === userEmailLC));
+    const mySlotsAll    = (slots || []).filter(s => s.studentEmail === (user && user.email));
     const currentCount  = mySlotsAll.length;
     let phase = 3, phaseNameLabel = "Phase 3: Unlimited";
     if (matchingLocked) { phase = 0; phaseNameLabel = "Phase 0: View Only"; }
@@ -121,18 +163,15 @@
       <h1 style="margin:0;"><%= user && user.fName ? user.fName : (user?.email || "Student") %></h1>
     </div>
     <div style="margin-left:auto;">
-      <% if (matchingLocked && !confirmed) { %>
+      <% if (!confirmed) { %>
         <form action="/confirm" method="post"
               onsubmit="return confirm('Once you confirm, you can’t remove slots. Continue?')">
           <input type="hidden" name="userEmail" value="<%= user.email %>">
           <button class="btn-soft" type="submit">Confirm my slots</button>
         </form>
-      <% } else if (confirmed) { %>
-        <div class="muted" style="margin-top:8px;">You’ve confirmed your slots.</div>
       <% } %>
     </div>
-
-
+  </div>
 
   <!-- Your Matches -->
   <div class="section-block your">
@@ -154,7 +193,7 @@
         </div>
         <div class="muted"><%= (slot.notes && slot.notes.trim()) ? slot.notes : '—' %></div>
         <% if (!confirmed) { 
-             const confirmMsg = (phase >= 2) ? "Are you sure you want to remove this slot?" : "Remove this slot?";
+             const confirmMsg = (phase >= 2) ? "Are you sure you want to remove this slot? You’re in the confirmation phase." : "Remove this slot?";
         %>
           <form action="/unclaim" method="post" onsubmit="return confirm('<%= confirmMsg %>')">
             <input type="hidden" name="slotId" value="<%= slot._id %>">
@@ -164,6 +203,11 @@
         <% } %>
       </div>
     <% }); %>
+    <% if (confirmed) { %>
+      <div class="alert alert-success alert-sticky" style="margin-top:10px;">
+        Your slots have been confirmed.
+      </div>
+    <% } %>
   </div>
 
   <% if (!matchingLocked) { %>
@@ -178,9 +222,13 @@
       %>
 
       <div class="filter-card">
+        <div class="filter-head" style="font-weight:600; color:#374151; margin-bottom:10px;">Search & Filter</div>
+
         <div class="controls">
           <div class="searchbar-wrap">
+            <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M21 21l-4.2-4.2m1.2-4.8a7 7 0 11-14 0 7 7 0 0114 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             <input id="search" class="searchbar" placeholder="Search by physician, specialty, location, or notes…">
+            <button id="clearSearch" type="button" class="btn-ghost" style="display:none;">Clear</button>
           </div>
 
           <div class="dropdown" id="specDropdownWrap">
@@ -197,26 +245,26 @@
             <div class="muted" id="specHint" style="margin-top:6px;">All specialties selected</div>
           </div>
 
-          <label class="checkbox">
-            <input id="onlyOpen" type="checkbox" checked>
-            <span>Only show not claimed</span>
-          </label>
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <label class="pill-filter" id="onlyOpenPill">
+              <input id="onlyOpen" type="checkbox" checked>
+              <span>Only show not claimed</span>
+            </label>
+          </div>
         </div>
       </div>
 
       <div id="slotList">
-        <% (slots || []).forEach(function(slot){
+        <% (slots || []).forEach(function(slot, i){
              const isPCP2 = ['Family Medicine (PCP)','Primary Care'].includes((slot.physSpecialty||'').trim());
              let claimDisabledReason = null;
              if (phase === 0) claimDisabledReason = "View-only phase";
              else if (phase === 1 && !isPCP2) claimDisabledReason = "PCP-only active";
              else if (phase === 2 && (currentCount >= 2)) claimDisabledReason = "Limit of 2 reached";
-             const studentEmailLC = (slot.studentEmail || "").toLowerCase();
-             const claimedState = slot.studentEmail
-              ? (studentEmailLC === userEmailLC ? "me" : "other")
-                : "no";
+             const claimedState = slot.studentEmail ? (slot.studentEmail === (user && user.email) ? "me" : "other") : "no";
         %>
           <div class="slot-card searchable"
+               style="animation-delay:<%= (i%8)*20 %>ms"
                data-search="<%= [slot.physName, slot.physSpecialty, slot.location, slot.notes].filter(Boolean).join(' ').toLowerCase() %>"
                data-spec="<%= (slot.physSpecialty||'').trim() %>"
                data-claimed="<%= claimedState %>">
@@ -244,7 +292,7 @@
               <% } else { %>
                 <% if (slot.studentEmail === (user && user.email)) { %>
                   <form action="/unclaim" method="post" style="display:inline;"
-                        onsubmit="return confirm('Remove this slot?')">
+                        onsubmit="return confirm('<%= (phase >= 2) ? 'Are you sure you want to remove this slot? You’re in the confirmation phase.' : 'Remove this slot?' %>')">
                     <input type="hidden" name="userEmail" value="<%= user.email %>">
                     <input type="hidden" name="slotId" value="<%= slot._id %>">
                     <button type="submit" class="btn-ghost">Remove</button>
@@ -263,10 +311,23 @@
 </div>
 
 <script>
+  // Dismiss closable alerts
+  document.querySelectorAll('.alert .close').forEach(btn => {
+    btn.addEventListener('click', () => btn.closest('.alert')?.remove());
+  });
+
   (function(){
     const q = document.getElementById('search');
+    const clearBtn = document.getElementById('clearSearch');
     const onlyOpen = document.getElementById('onlyOpen');
+    const onlyOpenPill = document.getElementById('onlyOpenPill');
     const cards = Array.from(document.querySelectorAll('#slotList .slot-card'));
+
+    // Keep dropdown open when clicking inside it
+    document.querySelectorAll('.dropdown-menu').forEach(menu => {
+      menu.addEventListener('click', e => e.stopPropagation());
+    });
+
     const specAll = document.getElementById('specAll');
     const specChecks = Array.from(document.querySelectorAll('.spec-option'));
     const specHint = document.getElementById('specHint');
@@ -285,4 +346,49 @@
       const query = (q?.value || '').toLowerCase().trim();
       if (query && !(card.dataset.search || '').includes(query)) return false;
       const chosen = specAll?.checked ? [] : selectedSpecs();
-      if (chosen.length && !chosen.includes(card.dataset.spec || '')) return false
+      if (chosen.length && !chosen.includes(card.dataset.spec || '')) return false;
+      const claimed = card.getAttribute('data-claimed');
+      if (onlyOpen && onlyOpen.checked && claimed !== 'no') return false;
+      return true;
+    }
+    function apply(){
+      cards.forEach(c => { c.style.display = matches(c) ? '' : 'none'; });
+      clearBtn.style.display = (q && q.value && q.value.length) ? '' : 'none';
+      onlyOpenPill.classList.toggle('off', !(onlyOpen && onlyOpen.checked));
+    }
+
+    q?.addEventListener('input', apply);
+    clearBtn?.addEventListener('click', () => { q.value=''; q.focus(); apply(); });
+    onlyOpen?.addEventListener('change', apply);
+
+    specAll?.addEventListener('change', () => {
+      if (specAll.checked) specChecks.forEach(c => c.checked = false);
+      updateSpecHint(); apply();
+    });
+    specChecks.forEach(c => c.addEventListener('change', () => {
+      specAll.checked = !specChecks.some(x => x.checked);
+      updateSpecHint(); apply();
+    }));
+
+    updateSpecHint(); apply();
+  })();
+
+  // Auto-dismiss non-sticky alerts after 5s
+  setTimeout(() => {
+    document.querySelectorAll('.alert:not(.alert-sticky)').forEach(el => {
+      el.style.transition = 'opacity 0.5s ease';
+      el.style.opacity = '0';
+      setTimeout(() => el.remove(), 500);
+    });
+  }, 5000);
+</script>
+
+<!-- Bootstrap (needed for dropdown) -->
+<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+<script>
+  $(function () { $('#specDropdown').dropdown(); });
+</script>
+
+<%- include("./partials/footer"); -%>
