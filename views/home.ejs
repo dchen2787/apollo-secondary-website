@@ -14,14 +14,6 @@
   .slot-card .head { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
   .muted { color:#6b7280; }
 
-  /* --- Fix dropdown appearing behind slot cards --- */
-  .section-block.browse,
-  .filter-card { position: relative; z-index: 20; }   /* lift filters above the list */
-  #slotList { position: relative; z-index: 1; }       /* keep cards underneath */
-  .slot-card { position: relative; z-index: 1; }      /* ensure no stray higher z-index */
-  
-  .dropdown-menu { z-index: 2000; }                   /* stronger than everything else */
-
   .btn-soft { background:#111827; color:#fff; border:none; border-radius:12px; padding:8px 14px; }
   .btn-soft[disabled] { opacity:.55; cursor:not-allowed; }
   .btn-ghost { background:#f3f4f6; border:none; border-radius:12px; padding:8px 14px; }
@@ -62,50 +54,15 @@
     padding-bottom: 6px;
   }
 
-  /* ===== Animated Search & Filters ===== */
-  .filter-card {
-    background:#ffffff; border:1px solid #e5e7eb; border-radius:16px; padding:16px;
-    box-shadow:0 10px 28px rgba(0,0,0,.06); margin:14px 0 18px;
-    animation: cardPop .35s ease both;
-  }
-  @keyframes cardPop { from{ transform: translateY(6px) scale(.98); opacity:0; } to{ transform: translateY(0) scale(1); opacity:1; } }
-
-  .controls {
-    display:grid;
-    grid-template-columns: minmax(320px, 560px) minmax(240px, 320px) auto;
-    gap:14px; align-items:center;
-  }
-
-  .searchbar-wrap {
-    position:relative; display:flex; align-items:center; gap:10px;
-    background:#f9fafb; border:1px solid #e5e7eb; border-radius:14px; padding:10px 12px;
-    transition: box-shadow .2s ease, transform .15s ease;
-  }
-  .searchbar-wrap:focus-within { box-shadow:0 12px 32px rgba(17,24,39,.12); transform: translateY(-1px); }
-  .searchbar-wrap .icon { width:18px; height:18px; opacity:.6; }
+  /* Filters */
+  .filter-card { background:#ffffff; border:1px solid #e5e7eb; border-radius:16px; padding:16px; box-shadow:0 6px 16px rgba(0,0,0,.05); margin:14px 0 18px; }
+  .controls { display:grid; grid-template-columns: minmax(320px, 560px) minmax(240px, 320px) auto; gap:14px; align-items:center; }
+  .searchbar-wrap { position:relative; display:flex; align-items:center; gap:10px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:14px; padding:10px 12px; }
   .searchbar { flex:1; border:0; background:transparent; outline:none; padding:6px 2px; font-size:16px; }
-
   .dropdown { position:relative; width:100%; }
-  .dropdown-toggle {
-    width:100%; text-align:left; background:#f9fafb; border:1px solid #e5e7eb; border-radius:12px;
-    padding:10px 14px; transition: box-shadow .2s ease, transform .15s ease;
-  }
-  .dropdown-toggle:focus { outline:none; box-shadow:0 12px 32px rgba(17,24,39,.12); transform: translateY(-1px); }
-  .dropdown-menu {
-    width:100%; max-height:260px; overflow:auto;
-    border-radius:12px; border:1px solid #e5e7eb; box-shadow:0 16px 36px rgba(0,0,0,.1);
-    animation: menuFade .15s ease both;
-  }
-  @keyframes menuFade { from{opacity:0; transform: translateY(-4px);} to{opacity:1; transform:none;} }
-
-  .pill-filter {
-    display:inline-flex; align-items:center; gap:8px; padding:6px 10px; font-size:12px;
-    background:#eef2ff; color:#1e40af; border-radius:999px; margin-top:6px; transition: background .15s;
-  }
-  .pill-filter.off { background:#f3f4f6; color:#374151; }
-
-  #slotList .slot-card { animation: slotIn .25s ease both; }
-  @keyframes slotIn { from{opacity:0; transform: translateY(8px);} to{opacity:1; transform:none;} }
+  .dropdown-toggle { width:100%; text-align:left; background:#f9fafb; border:1px solid #e5e7eb; border-radius:12px; padding:10px 14px; }
+  .dropdown-menu { width:100%; max-height:260px; overflow:auto; border-radius:12px; border:1px solid #e5e7eb; box-shadow:0 8px 24px rgba(0,0,0,.1); }
+  label.checkbox { display:flex; align-items:center; gap:8px; }
 </style>
 
 <div class="container">
@@ -204,11 +161,6 @@
         <% } %>
       </div>
     <% }); %>
-    <% if (confirmed) { %>
-      <div class="alert alert-success alert-sticky" style="margin-top:10px;">
-        Your slots have been confirmed.
-      </div>
-    <% } %>
   </div>
 
   <% if (!matchingLocked) { %>
@@ -223,13 +175,9 @@
       %>
 
       <div class="filter-card">
-        <div class="filter-head" style="font-weight:600; color:#374151; margin-bottom:10px;">Search & Filter</div>
-
         <div class="controls">
           <div class="searchbar-wrap">
-            <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M21 21l-4.2-4.2m1.2-4.8a7 7 0 11-14 0 7 7 0 0114 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             <input id="search" class="searchbar" placeholder="Search by physician, specialty, location, or notes…">
-            <button id="clearSearch" type="button" class="btn-ghost" style="display:none;">Clear</button>
           </div>
 
           <div class="dropdown" id="specDropdownWrap">
@@ -246,17 +194,15 @@
             <div class="muted" id="specHint" style="margin-top:6px;">All specialties selected</div>
           </div>
 
-          <div style="display:flex; flex-direction:column; gap:8px;">
-            <label class="pill-filter" id="onlyOpenPill">
-              <input id="onlyOpen" type="checkbox" checked>
-              <span>Only show not claimed</span>
-            </label>
-          </div>
+          <label class="checkbox">
+            <input id="onlyOpen" type="checkbox" checked>
+            <span>Only show not claimed</span>
+          </label>
         </div>
       </div>
 
       <div id="slotList">
-        <% (slots || []).forEach(function(slot, i){
+        <% (slots || []).forEach(function(slot){
              const isPCP2 = ['Family Medicine (PCP)','Primary Care'].includes((slot.physSpecialty||'').trim());
              let claimDisabledReason = null;
              if (phase === 0) claimDisabledReason = "View-only phase";
@@ -268,7 +214,6 @@
                 : "no";
         %>
           <div class="slot-card searchable"
-               style="animation-delay:<%= (i%8)*20 %>ms"
                data-search="<%= [slot.physName, slot.physSpecialty, slot.location, slot.notes].filter(Boolean).join(' ').toLowerCase() %>"
                data-spec="<%= (slot.physSpecialty||'').trim() %>"
                data-claimed="<%= claimedState %>">
@@ -296,7 +241,7 @@
               <% } else { %>
                 <% if (slot.studentEmail === (user && user.email)) { %>
                   <form action="/unclaim" method="post" style="display:inline;"
-                        onsubmit="return confirm('<%= (phase >= 2) ? 'Are you sure you want to remove this slot? You’re in the confirmation phase.' : 'Remove this slot?' %>')">
+                        onsubmit="return confirm('Remove this slot?')">
                     <input type="hidden" name="userEmail" value="<%= user.email %>">
                     <input type="hidden" name="slotId" value="<%= slot._id %>">
                     <button type="submit" class="btn-ghost">Remove</button>
@@ -315,23 +260,10 @@
 </div>
 
 <script>
-  // Dismiss closable alerts
-  document.querySelectorAll('.alert .close').forEach(btn => {
-    btn.addEventListener('click', () => btn.closest('.alert')?.remove());
-  });
-
   (function(){
     const q = document.getElementById('search');
-    const clearBtn = document.getElementById('clearSearch');
     const onlyOpen = document.getElementById('onlyOpen');
-    const onlyOpenPill = document.getElementById('onlyOpenPill');
     const cards = Array.from(document.querySelectorAll('#slotList .slot-card'));
-
-    // Keep dropdown open when clicking inside it
-    document.querySelectorAll('.dropdown-menu').forEach(menu => {
-      menu.addEventListener('click', e => e.stopPropagation());
-    });
-
     const specAll = document.getElementById('specAll');
     const specChecks = Array.from(document.querySelectorAll('.spec-option'));
     const specHint = document.getElementById('specHint');
@@ -350,270 +282,4 @@
       const query = (q?.value || '').toLowerCase().trim();
       if (query && !(card.dataset.search || '').includes(query)) return false;
       const chosen = specAll?.checked ? [] : selectedSpecs();
-      if (chosen.length && !chosen.includes(card.dataset.spec || '')) return false;
-      const claimed = card.getAttribute('data-claimed');
-      if (onlyOpen && onlyOpen.checked && claimed !== 'no') return false;
-      return true;
-    }
-    function apply(){
-      cards.forEach(c => { c.style.display = matches(c) ? '' : 'none'; });
-      clearBtn.style.display = (q && q.value && q.value.length) ? '' : 'none';
-      onlyOpenPill.classList.toggle('off', !(onlyOpen && onlyOpen.checked));
-    }
-
-    q?.addEventListener('input', apply);
-    clearBtn?.addEventListener('click', () => { q.value=''; q.focus(); apply(); });
-    onlyOpen?.addEventListener('change', apply);
-
-    specAll?.addEventListener('change', () => {
-      if (specAll.checked) specChecks.forEach(c => c.checked = false);
-      updateSpecHint(); apply();
-    });
-    specChecks.forEach(c => c.addEventListener('change', () => {
-      specAll.checked = !specChecks.some(x => x.checked);
-      updateSpecHint(); apply();
-    }));
-
-    updateSpecHint(); apply();
-  })();
-
-  // Auto-dismiss non-sticky alerts after 5s
-  setTimeout(() => {
-    document.querySelectorAll('.alert:not(.alert-sticky)').forEach(el => {
-      el.style.transition = 'opacity 0.5s ease';
-      el.style.opacity = '0';
-      setTimeout(() => el.remove(), 500);
-    });
-  }, 5000);
-</script>
-
-<!-- Bootstrap (needed for dropdown) -->
-<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
-<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
-<script>
-  $(function () { $('#specDropdown').dropdown(); });
-</script>
-
-<!-- ========================= -->
-<!-- Extra Animations Pack -->
-<!-- ========================= -->
-
-<style>
-  :root{
-    --anim-fast: 180ms;
-    --anim-med: 340ms;
-    --anim-slow: 700ms;
-    --spring: cubic-bezier(.2,.9,.2,1);
-  }
-
-  /* Respect reduced motion */
-  @media (prefers-reduced-motion: reduce) {
-    * { animation: none !important; transition: none !important; }
-  }
-
-  /* Keyframes */
-  @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(8px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-  @keyframes softPop {
-    0%   { transform: scale(.96); opacity:0; }
-    60%  { transform: scale(1.02); opacity:1; }
-    100% { transform: scale(1); }
-  }
-  @keyframes floatY {
-    0%,100% { transform: translateY(0); }
-    50%     { transform: translateY(-4px); }
-  }
-  @keyframes shimmer {
-    0%   { background-position: -200% 0; }
-    100% { background-position: 200% 0; }
-  }
-  @keyframes dropIn {
-    0%   { opacity:0; transform: translateY(-8px) scale(.98); }
-    100% { opacity:1; transform: translateY(0) scale(1); }
-  }
-
-  /* Page hero entrance */
-  .page-hero {
-    animation: fadeUp var(--anim-med) var(--spring) both;
-  }
-  .avatar {
-    animation: softPop var(--anim-med) var(--spring) both, floatY 4s ease-in-out infinite;
-  }
-
-  /* Alerts shimmer on first paint (subtle) */
-  .alert.alert-success.alert-sticky {
-    position: relative;
-    overflow: hidden;
-  }
-  .alert.alert-success.alert-sticky::after{
-    content:"";
-    position:absolute; inset:0;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,.35), transparent);
-    background-size: 200% 100%;
-    animation: shimmer 2.2s ease 1;
-    pointer-events:none;
-  }
-
-  /* Section blocks entrance */
-  .section-block {
-    transform-origin: top center;
-    animation: softPop var(--anim-med) var(--spring) both;
-  }
-  .section-block + .section-block {
-    animation-delay: 120ms;
-  }
-
-  /* Filter card spring + focus glow */
-  .filter-card {
-    transition: transform var(--anim-med) var(--spring), box-shadow var(--anim-med);
-  }
-  .filter-card:focus-within {
-    transform: translateY(-1px);
-    box-shadow: 0 12px 30px rgba(0,0,0,.08);
-  }
-
-  /* Dropdown pop */
-  .dropdown-menu {
-    transform-origin: 20% top;
-    animation: dropIn var(--anim-fast) var(--spring) both;
-  }
-
-  /* Slot card reveal + hover */
-  .slot-card {
-    transform: translateY(6px);
-    opacity: 0;
-    will-change: transform, opacity, box-shadow;
-  }
-  .slot-card.reveal {
-    animation: fadeUp var(--anim-med) var(--spring) both;
-  }
-  .slot-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 24px rgba(0,0,0,.09);
-    transition: box-shadow var(--anim-med), transform var(--anim-med);
-  }
-
-  /* Badges shimmer on hover (micro) */
-  .badge-soft {
-    background-image: linear-gradient(90deg, #dbeafe, #eaf2ff, #dbeafe);
-    background-size: 200% 100%;
-    transition: filter var(--anim-fast), transform var(--anim-fast);
-  }
-  .slot-card:hover .badge-soft {
-    animation: shimmer 1.2s linear infinite;
-    filter: saturate(1.15);
-  }
-
-  /* Buttons: gentle lift + ripple */
-  .btn-soft, .btn-ghost {
-    position: relative;
-    overflow: hidden;
-    transform: translateZ(0);
-    transition: transform var(--anim-fast), box-shadow var(--anim-fast);
-  }
-  .btn-soft:hover, .btn-ghost:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 6px 16px rgba(0,0,0,.08);
-  }
-  .btn-ripple {
-    position:absolute; border-radius:50%;
-    transform: translate(-50%, -50%);
-    pointer-events:none; width:10px; height:10px; opacity:.25;
-    background: currentColor;
-    animation: ripple 600ms ease-out forwards;
-  }
-  @keyframes ripple {
-    from { transform: translate(-50%,-50%) scale(1); opacity:.3; }
-    to   { transform: translate(-50%,-50%) scale(18); opacity:0; }
-  }
-
-  /* Confirm button pulse (only if visible) */
-  form[action="/confirm"] .btn-soft {
-    box-shadow: 0 8px 20px rgba(17,24,39,.15);
-    animation: pulseGlow 2.2s ease-in-out infinite;
-  }
-  @keyframes pulseGlow {
-    0%,100% { box-shadow: 0 8px 20px rgba(17,24,39,.12); }
-    50%     { box-shadow: 0 12px 28px rgba(17,24,39,.22); }
-  }
-
-  /* Fancy focus ring (keyboard users) */
-  .searchbar:focus, .dropdown-toggle:focus, .btn-soft:focus, .btn-ghost:focus {
-    outline: none;
-    box-shadow: 0 0 0 3px rgba(59,130,246,.25);
-  }
-
-  /* Lift filters above list (in case) */
-  .section-block.browse, .filter-card { position: relative; z-index: 20; }
-  #slotList, .slot-card { position: relative; z-index: 1; }
-  .dropdown-menu { z-index: 2000; }
-</style>
-
-<script>
-  (function(){
-    // Stagger reveal for slot cards on load & on filter changes
-    const list = document.getElementById('slotList');
-    const cards = list ? Array.from(list.querySelectorAll('.slot-card')) : [];
-
-    function revealStagger(targetCards) {
-      let delay = 0;
-      targetCards.forEach(card => {
-        card.classList.remove('reveal');
-        card.style.animationDelay = '0ms';
-      });
-      targetCards.filter(c => c.style.display !== 'none').slice(0, 30).forEach((card, i) => {
-        delay = 30 * i;
-        card.style.animationDelay = delay + 'ms';
-        card.classList.add('reveal');
-      });
-    }
-
-    // On initial load
-    revealStagger(cards);
-
-    // Hook into existing filter apply (monkey-patch)
-    const applyFilters = () => {
-      // Try to find your existing filter function context
-      // We just trigger a stagger on visible cards.
-      const visible = cards.filter(c => c.style.display !== 'none');
-      revealStagger(visible);
-    };
-
-    // Observe changes to #slotList (when filtering hides/shows)
-    if ('MutationObserver' in window && list) {
-      const mo = new MutationObserver(() => applyFilters());
-      mo.observe(list, { attributes: true, subtree: true, attributeFilter: ['style','class'] });
-    }
-
-    // Button ripple effect
-    function addRipple(e){
-      const btn = e.currentTarget;
-      const rect = btn.getBoundingClientRect();
-      const ripple = document.createElement('span');
-      ripple.className = 'btn-ripple';
-      ripple.style.left = (e.clientX - rect.left) + 'px';
-      ripple.style.top  = (e.clientY - rect.top)  + 'px';
-      btn.appendChild(ripple);
-      setTimeout(() => ripple.remove(), 650);
-    }
-    document.querySelectorAll('.btn-soft, .btn-ghost').forEach(b => {
-      b.addEventListener('click', addRipple);
-    });
-
-    // Smooth scroll to filters when user focuses search
-    const search = document.getElementById('search');
-    if (search) {
-      search.addEventListener('focus', () => {
-        const wrap = document.querySelector('.section-block.browse');
-        if (!wrap) return;
-        const y = wrap.getBoundingClientRect().top + window.pageYOffset - 12;
-        window.scrollTo({ top: y, behavior: 'smooth' });
-      });
-    }
-  })();
-</script>
-
-<%- include("./partials/footer"); -%>
+      if (chosen.length && !chosen.includes(card.dataset.spec || '')) return false
