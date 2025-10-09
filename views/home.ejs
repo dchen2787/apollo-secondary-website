@@ -114,7 +114,8 @@
     const matchingLocked = !!(controls && controls.matchingLocked);
     const pcpOnlyFlag   = !!(controls && controls.PCPonly);
     const maxAllowed    = (typeof maxSlots === 'number' ? maxSlots : 9999);
-    const mySlotsAll    = (slots || []).filter(s => s.studentEmail === (user && user.email));
+    const userEmailLC = ((user && user.email) || "").toLowerCase();
+    const mySlotsAll  = (slots || []).filter(s => ((s.studentEmail || "").toLowerCase() === userEmailLC));
     const currentCount  = mySlotsAll.length;
     let phase = 3, phaseNameLabel = "Phase 3: Unlimited";
     if (matchingLocked) { phase = 0; phaseNameLabel = "Phase 0: View Only"; }
@@ -261,7 +262,10 @@
              if (phase === 0) claimDisabledReason = "View-only phase";
              else if (phase === 1 && !isPCP2) claimDisabledReason = "PCP-only active";
              else if (phase === 2 && (currentCount >= 2)) claimDisabledReason = "Limit of 2 reached";
-             const claimedState = slot.studentEmail ? (slot.studentEmail === (user && user.email) ? "me" : "other") : "no";
+             const studentEmailLC = (slot.studentEmail || "").toLowerCase();
+             const claimedState = slot.studentEmail
+              ? (studentEmailLC === userEmailLC ? "me" : "other")
+                : "no";
         %>
           <div class="slot-card searchable"
                style="animation-delay:<%= (i%8)*20 %>ms"
