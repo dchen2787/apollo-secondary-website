@@ -13,6 +13,7 @@
   .slot-card { border-radius:18px; padding:14px; background:#fff; margin-bottom:12px; box-shadow:0 4px 12px rgba(0,0,0,.07); }
   .slot-card .head { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
   .muted { color:#6b7280; }
+
   .btn-soft { background:#111827; color:#fff; border:none; border-radius:12px; padding:8px 14px; }
   .btn-soft[disabled] { opacity:.55; cursor:not-allowed; }
   .btn-ghost { background:#f3f4f6; border:none; border-radius:12px; padding:8px 14px; }
@@ -33,32 +34,6 @@
   /* Locked banner (permanent) */
   .lock-banner-wrap { margin:18px 0; }
   .lock-banner { border-radius:16px; padding:14px 16px; background:#fff7ed; color:#9a3412; border:1px solid #fcd49b; }
-
-  /* Filter panel */
-  .filter-card { background:#ffffff; border:1px solid #e5e7eb; box-shadow:0 8px 24px rgba(0,0,0,.06); border-radius:16px; padding:16px; margin:14px 0 18px; }
-  .filter-head { font-weight:600; color:#374151; margin-bottom:10px; }
-  .controls {
-    display:grid;
-    grid-template-columns: minmax(280px, 520px) minmax(240px, 340px) auto;
-    gap:16px;
-    justify-content:center;
-    align-items:center;
-  }
-  .searchbar { border-radius:12px; border:1px solid #e5e7eb; padding:10px 12px; width:100%; }
-  .dropdown { width:100%; position:relative; }
-  .dropdown .dropdown-toggle { 
-    width:100%; 
-    border-radius:12px; padding:10px 14px; 
-    border:1px solid #e5e7eb; background:#f9fafb; 
-    text-align:left;
-  }
-  .dropdown .dropdown-menu { 
-    max-height:260px; overflow:auto; 
-    z-index: 1060; 
-    width:100%;
-  }
-  #specHint { text-align:center; width:100%; font-size:12px; margin-top:6px; }
-  label.checkbox { display:flex; align-items:center; gap:8px; }
 
   /* Section separation */
   .section-divider { height: 36px; }
@@ -90,25 +65,25 @@
     const maxAllowed    = (typeof maxSlots === 'number' ? maxSlots : 9999);
 
     // Your current picks:
-    const mySlotsAll    = (slots || []).filter(s => s.studentEmail === user.email);
+    const mySlotsAll    = (slots || []).filter(s => s.studentEmail === (user && user.email));
     const currentCount  = mySlotsAll.length;
 
     // Phase logic:
-    let phase = 3, phaseName = "Phase 3: Unlimited";
-    if (matchingLocked) { phase = 0; phaseName = "Phase 0: View Only"; }
-    else if (pcpOnlyFlag) { phase = 1; phaseName = "Phase 1: PCP Only"; }
-    else if (maxAllowed === 2) { phase = 2; phaseName = "Phase 2: Two‑slot Limit"; }
+    let phase = 3, phaseNameLabel = "Phase 3: Unlimited";
+    if (matchingLocked) { phase = 0; phaseNameLabel = "Phase 0: View Only"; }
+    else if (pcpOnlyFlag) { phase = 1; phaseNameLabel = "Phase 1: PCP Only"; }
+    else if (maxAllowed === 2) { phase = 2; phaseNameLabel = "Phase 2: Two-slot Limit"; }
   %>
 
   <% /* Phase banner (HIDDEN when locked) */ %>
   <% if (!matchingLocked) { %>
     <div class="phase-banner p<%= phase %>">
-      <strong><%= phaseName %></strong>
+      <strong><%= phaseNameLabel %></strong>
       <p style="margin-top:4px;">
         <% if (phase === 0) { %>
-          View‑only: you can browse slots but cannot claim yet.
+          View-only: you can browse slots but cannot claim yet.
         <% } else if (phase === 1) { %>
-          PCP‑only: you may claim <strong>Primary Care</strong> slots only. Non‑PCP slots are temporarily unavailable.
+          PCP-only: you may claim <strong>Primary Care</strong> slots only. Non-PCP slots are temporarily unavailable.
         <% } else if (phase === 2) { %>
           You may claim up to <strong>2</strong> slots total this phase.
         <% } else { %>
@@ -147,10 +122,11 @@
       <h1 style="margin:0;"><%= user && user.fName ? user.fName : (user?.email || "Student") %></h1>
     </div>
     <div style="margin-left:auto;">
-      <% if (matchingLocked && !confirmed) { %>
-        <form action="/confirm" method="post">
+      <% if (!confirmed) { %>
+        <form action="/confirm" method="post"
+              onsubmit="return confirm('Once you confirm, you can’t remove slots. Continue?')">
           <input type="hidden" name="userEmail" value="<%= user.email %>">
-          <button class="btn-soft">Confirm My Slots</button>
+          <button class="btn-soft" type="submit">Confirm my slots</button>
         </form>
       <% } %>
     </div>
@@ -171,18 +147,27 @@
         <div class="head">
           <strong><%= slot.physName || '—' %></strong>
           <% if (slot.physSpecialty) { %><span class="badge-soft"><%= slot.physSpecialty %></span><% } %>
-          <% if (PCPonly && slot.physSpecialty && !isPCP) { %><span class="pill-nonpcp">Non‑PCP</span><% } %>
+          <% if (PCPonly && slot.physSpecialty && !isPCP) { %><span class="pill-nonpcp">Non-PCP</span><% } %>
         </div>
         <div class="muted" style="margin:6px 0;">
           <strong><%= slot.dDate || '-' %></strong> • <%= (slot.timeStart || '-') %> to <%= (slot.timeEnd || '-') %> • <%= slot.location || '-' %>
         </div>
         <div class="muted"><%= (slot.notes && slot.notes.trim()) ? slot.notes : '—' %></div>
         <div style="margin-top:10px;">
-          <% if (!confirmed) { %>
-            <form action="/unclaim" method="post" style="display:inline;">
-              <input type="hidden" name="userEmail" value="<%= user.email %>">
+          <% if (!confirmed) { 
+               const isLocked = !!(controls && controls.matchingLocked);
+               const confirmMsg =
+                 isLocked
+                   ? "Matching is locked. Are you sure you want to remove this slot?"
+                   : (phase >= 2
+                       ? "Are you sure you want to remove this slot? You’re in the confirmation phase."
+                       : "Remove this slot?");
+          %>
+            <form action="/unclaim" method="post"
+                  onsubmit="return confirm('<%= confirmMsg %>')">
               <input type="hidden" name="slotId" value="<%= slot._id %>">
-              <button type="submit" class="btn-ghost">Remove</button>
+              <input type="hidden" name="userEmail" value="<%= user.email %>">
+              <button class="btn-ghost" type="submit">Remove</button>
             </form>
           <% } %>
         </div>
@@ -219,7 +204,7 @@
           <input id="search" class="searchbar" placeholder="Search by physician, specialty, location, or notes…">
           <div class="dropdown" id="specDropdownWrap">
             <button class="dropdown-toggle" type="button" id="specDropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" role="button">
-              Specialties (multi‑select)
+              Specialties (multi-select)
             </button>
             <div class="dropdown-menu p-2" aria-labelledby="specDropdown">
               <label class="dropdown-item">
@@ -251,7 +236,7 @@
              else if (phase === 1 && !isPCP2) claimDisabledReason = "PCP-only is active";
              else if (phase === 2 && (currentCount >= 2)) claimDisabledReason = "Limit of 2 reached";
 
-             const claimedState = slot.studentEmail ? (slot.studentEmail === user.email ? "me" : "other") : "no";
+             const claimedState = slot.studentEmail ? (slot.studentEmail === (user && user.email) ? "me" : "other") : "no";
         %>
           <div class="slot-card searchable"
                data-search="<%= [slot.physName, slot.physSpecialty, slot.location, slot.notes].filter(Boolean).join(' ').toLowerCase() %>"
@@ -260,7 +245,7 @@
             <div class="head">
               <strong><%= slot.physName || '—' %></strong>
               <% if (slot.physSpecialty) { %><span class="badge-soft"><%= slot.physSpecialty %></span><% } %>
-              <% if (phase === 1 && slot.physSpecialty && !isPCP2) { %><span class="pill-nonpcp">Non‑PCP</span><% } %>
+              <% if (phase === 1 && slot.physSpecialty && !isPCP2) { %><span class="pill-nonpcp">Non-PCP</span><% } %>
             </div>
             <div class="muted" style="margin:6px 0;">
               <strong><%= slot.dDate || '-' %></strong> • <%= (slot.timeStart || '-') %> to <%= (slot.timeEnd || '-') %> • <%= slot.location || '-' %>
@@ -282,8 +267,9 @@
                   <span class="muted" style="margin-left:8px;"><%= claimDisabledReason %></span>
                 <% } %>
               <% } else { %>
-                <% if (slot.studentEmail === user.email) { %>
-                  <form action="/unclaim" method="post" style="display:inline;">
+                <% if (slot.studentEmail === (user && user.email)) { %>
+                  <form action="/unclaim" method="post" style="display:inline;"
+                        onsubmit="return confirm('<%= (phase >= 2) ? 'Are you sure you want to remove this slot? You’re in the confirmation phase.' : 'Remove this slot?' %>')">
                     <input type="hidden" name="userEmail" value="<%= user.email %>">
                     <input type="hidden" name="slotId" value="<%= slot._id %>">
                     <button type="submit" class="btn-ghost">Remove</button>
@@ -336,8 +322,9 @@
       if (query && !(card.dataset.search || '').includes(query)) return false;
       const chosen = specAll?.checked ? [] : selectedSpecs();
       if (chosen.length && !chosen.includes(card.dataset.spec || '')) return false;
+      const onlyOpenBox = onlyOpen && onlyOpen.checked;
       const claimed = card.getAttribute('data-claimed');
-      if (onlyOpen && onlyOpen.checked && claimed !== 'no') return false;
+      if (onlyOpenBox && claimed !== 'no') return false;
       return true;
     }
     function apply(){ cards.forEach(c => { c.style.display = matches(c) ? '' : 'none'; }); }
@@ -356,9 +343,7 @@
 
     updateSpecHint(); apply();
   })();
-</script>
 
-<script>
   // Auto-dismiss alerts after 5s, but NOT sticky success banners
   setTimeout(() => {
     document.querySelectorAll('.alert:not(.alert-sticky)').forEach(el => {
