@@ -21,21 +21,20 @@
   /* Alerts */
   .alert { position:relative; border-radius:14px; padding:10px 40px 10px 12px; margin:8px 0; }
   .alert-info { background:#eff6ff; color:#1d4ed8; }
-  .alert-success { background:#ecfdf5; color:#065f46; } /* green */
+  .alert-success { background:#ecfdf5; color:#065f46; }
   .alert-warning { background:#fff7ed; color:#9a3412; }
   .alert .close { position:absolute; right:10px; top:8px; background:transparent; border:0; font-size:20px; line-height:1; color:inherit; opacity:.6; }
 
-  /* Phase banner (big and obvious for PCP only) */
+  /* Phase banner */
   .phase-banner { border-radius:16px; padding:14px 16px; border:1px solid #dbeafe; background:#eff6ff; color:#1e3a8a; margin:12px 0; }
   .phase-banner.p0 { background:#f3f4f6; border-color:#e5e7eb; color:#111827; }
-  .phase-banner.p1 { background:#fff1f2; border-color:#fecaca; color:#991b1b; } /* PCP only: louder */
+  .phase-banner.p1 { background:#fff1f2; border-color:#fecaca; color:#991b1b; }
   .phase-banner p { margin:0; }
 
-  /* Locked banner (permanent) */
+  /* Locked banner */
   .lock-banner-wrap { margin:18px 0; }
   .lock-banner { border-radius:16px; padding:14px 16px; background:#fff7ed; color:#9a3412; border:1px solid #fcd49b; }
 
-  /* Section separation */
   .section-divider { height: 36px; }
   .section-block {
     background: #ffffff;
@@ -54,41 +53,75 @@
     border-bottom: 1px solid #e5e7eb;
     padding-bottom: 6px;
   }
+
+  /* ===== Animated Search & Filters ===== */
+  .filter-card {
+    background:#ffffff; border:1px solid #e5e7eb; border-radius:16px; padding:16px;
+    box-shadow:0 10px 28px rgba(0,0,0,.06); margin:14px 0 18px;
+    animation: cardPop .35s ease both;
+  }
+  @keyframes cardPop { from{ transform: translateY(6px) scale(.98); opacity:0; } to{ transform: translateY(0) scale(1); opacity:1; } }
+
+  .controls {
+    display:grid;
+    grid-template-columns: minmax(320px, 560px) minmax(240px, 320px) auto;
+    gap:14px; align-items:center;
+  }
+
+  .searchbar-wrap {
+    position:relative; display:flex; align-items:center; gap:10px;
+    background:#f9fafb; border:1px solid #e5e7eb; border-radius:14px; padding:10px 12px;
+    transition: box-shadow .2s ease, transform .15s ease;
+  }
+  .searchbar-wrap:focus-within { box-shadow:0 12px 32px rgba(17,24,39,.12); transform: translateY(-1px); }
+  .searchbar-wrap .icon { width:18px; height:18px; opacity:.6; }
+  .searchbar { flex:1; border:0; background:transparent; outline:none; padding:6px 2px; font-size:16px; }
+
+  .dropdown { position:relative; width:100%; }
+  .dropdown-toggle {
+    width:100%; text-align:left; background:#f9fafb; border:1px solid #e5e7eb; border-radius:12px;
+    padding:10px 14px; transition: box-shadow .2s ease, transform .15s ease;
+  }
+  .dropdown-toggle:focus { outline:none; box-shadow:0 12px 32px rgba(17,24,39,.12); transform: translateY(-1px); }
+  .dropdown-menu {
+    width:100%; max-height:260px; overflow:auto;
+    border-radius:12px; border:1px solid #e5e7eb; box-shadow:0 16px 36px rgba(0,0,0,.1);
+    animation: menuFade .15s ease both;
+  }
+  @keyframes menuFade { from{opacity:0; transform: translateY(-4px);} to{opacity:1; transform:none;} }
+
+  .pill-filter {
+    display:inline-flex; align-items:center; gap:8px; padding:6px 10px; font-size:12px;
+    background:#eef2ff; color:#1e40af; border-radius:999px; margin-top:6px; transition: background .15s;
+  }
+  .pill-filter.off { background:#f3f4f6; color:#374151; }
+
+  #slotList .slot-card { animation: slotIn .25s ease both; }
+  @keyframes slotIn { from{opacity:0; transform: translateY(8px);} to{opacity:1; transform:none;} }
 </style>
 
 <div class="container">
 
-  <% /* ---------- derive phase + counters up front ---------- */ %>
-  <%
+  <% 
     const matchingLocked = !!(controls && controls.matchingLocked);
     const pcpOnlyFlag   = !!(controls && controls.PCPonly);
     const maxAllowed    = (typeof maxSlots === 'number' ? maxSlots : 9999);
-
-    // Your current picks:
     const mySlotsAll    = (slots || []).filter(s => s.studentEmail === (user && user.email));
     const currentCount  = mySlotsAll.length;
-
-    // Phase logic:
     let phase = 3, phaseNameLabel = "Phase 3: Unlimited";
     if (matchingLocked) { phase = 0; phaseNameLabel = "Phase 0: View Only"; }
     else if (pcpOnlyFlag) { phase = 1; phaseNameLabel = "Phase 1: PCP Only"; }
     else if (maxAllowed === 2) { phase = 2; phaseNameLabel = "Phase 2: Two-slot Limit"; }
   %>
 
-  <% /* Phase banner (HIDDEN when locked) */ %>
   <% if (!matchingLocked) { %>
     <div class="phase-banner p<%= phase %>">
       <strong><%= phaseNameLabel %></strong>
       <p style="margin-top:4px;">
-        <% if (phase === 0) { %>
-          View-only: you can browse slots but cannot claim yet.
-        <% } else if (phase === 1) { %>
-          PCP-only: you may claim <strong>Primary Care</strong> slots only. Non-PCP slots are temporarily unavailable.
-        <% } else if (phase === 2) { %>
-          You may claim up to <strong>2</strong> slots total this phase.
-        <% } else { %>
-          You may claim an <strong>unlimited</strong> number of slots (subject to availability).
-        <% } %>
+        <% if (phase === 0) { %>View-only: you can browse slots but cannot claim yet.
+        <% } else if (phase === 1) { %>PCP-only: you may claim <strong>Primary Care</strong> slots only.
+        <% } else if (phase === 2) { %>You may claim up to <strong>2</strong> slots total this phase.
+        <% } else { %>You may claim an <strong>unlimited</strong> number of slots.<% } %>
       </p>
     </div>
   <% } %>
@@ -97,7 +130,7 @@
     <div class="lock-banner-wrap">
       <div class="lock-banner">
         Matching is currently locked. You can review your matches but cannot add new ones.
-        Your matches are locked at this time. If you have any questions or concerns, please contact apolloyimde@gmail.com.
+        Contact apolloyimde@gmail.com for assistance.
       </div>
     </div>
   <% } %>
@@ -135,42 +168,31 @@
   <!-- Your Matches -->
   <div class="section-block your">
     <h2 class="section-title">Your Matches</h2>
-    <%
-      if (mySlotsAll.length === 0) { %>
-        <div class="muted" style="margin-bottom:12px;">You haven’t claimed any slots yet.</div>
+    <% if (mySlotsAll.length === 0) { %>
+      <div class="muted">You haven’t claimed any slots yet.</div>
     <% } %>
-    <% const PCPonly = (phase === 1); %>
-    <% mySlotsAll.forEach(function(slot){
+    <% mySlotsAll.forEach(function(slot){ 
          const isPCP = ['Family Medicine (PCP)','Primary Care'].includes((slot.physSpecialty||'').trim());
     %>
       <div class="slot-card">
         <div class="head">
           <strong><%= slot.physName || '—' %></strong>
           <% if (slot.physSpecialty) { %><span class="badge-soft"><%= slot.physSpecialty %></span><% } %>
-          <% if (PCPonly && slot.physSpecialty && !isPCP) { %><span class="pill-nonpcp">Non-PCP</span><% } %>
+          <% if (phase === 1 && slot.physSpecialty && !isPCP) { %><span class="pill-nonpcp">Non-PCP</span><% } %>
         </div>
         <div class="muted" style="margin:6px 0;">
-          <strong><%= slot.dDate || '-' %></strong> • <%= (slot.timeStart || '-') %> to <%= (slot.timeEnd || '-') %> • <%= slot.location || '-' %>
+          <strong><%= slot.dDate || '-' %></strong> • <%= slot.timeStart || '-' %> to <%= slot.timeEnd || '-' %> • <%= slot.location || '-' %>
         </div>
         <div class="muted"><%= (slot.notes && slot.notes.trim()) ? slot.notes : '—' %></div>
-        <div style="margin-top:10px;">
-          <% if (!confirmed) { 
-               const isLocked = !!(controls && controls.matchingLocked);
-               const confirmMsg =
-                 isLocked
-                   ? "Matching is locked. Are you sure you want to remove this slot?"
-                   : (phase >= 2
-                       ? "Are you sure you want to remove this slot? You’re in the confirmation phase."
-                       : "Remove this slot?");
-          %>
-            <form action="/unclaim" method="post"
-                  onsubmit="return confirm('<%= confirmMsg %>')">
-              <input type="hidden" name="slotId" value="<%= slot._id %>">
-              <input type="hidden" name="userEmail" value="<%= user.email %>">
-              <button class="btn-ghost" type="submit">Remove</button>
-            </form>
-          <% } %>
-        </div>
+        <% if (!confirmed) { 
+             const confirmMsg = (phase >= 2) ? "Are you sure you want to remove this slot? You’re in the confirmation phase." : "Remove this slot?";
+        %>
+          <form action="/unclaim" method="post" onsubmit="return confirm('<%= confirmMsg %>')">
+            <input type="hidden" name="slotId" value="<%= slot._id %>">
+            <input type="hidden" name="userEmail" value="<%= user.email %>">
+            <button class="btn-ghost" type="submit">Remove</button>
+          </form>
+        <% } %>
       </div>
     <% }); %>
     <% if (confirmed) { %>
@@ -178,19 +200,12 @@
         Your slots have been confirmed.
       </div>
     <% } %>
-
-    <% if (matchingLocked) { %>
-      <hr />
-      <p style="font-size:18px; line-height:1.4; margin:16px 0 0;">
-        To confirm that you are willing and able to attend all the slots above, press the <strong>Confirm</strong> button.
-        Check date and location carefully. If you are unable to attend any of the slots above, please <strong>remove</strong> them before confirming.
-        Questions? Email the Apollo Team immediately.
-      </p>
-    <% } %>
   </div>
 
   <% if (!matchingLocked) { %>
     <div class="section-divider"></div>
+
+    <!-- Browse Slots -->
     <div class="section-block browse">
       <h2 class="section-title">Browse Slots</h2>
 
@@ -199,46 +214,49 @@
       %>
 
       <div class="filter-card">
-        <div class="filter-head">Search and filter</div>
+        <div class="filter-head" style="font-weight:600; color:#374151; margin-bottom:10px;">Search & Filter</div>
+
         <div class="controls">
-          <input id="search" class="searchbar" placeholder="Search by physician, specialty, location, or notes…">
+          <div class="searchbar-wrap">
+            <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M21 21l-4.2-4.2m1.2-4.8a7 7 0 11-14 0 7 7 0 0114 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <input id="search" class="searchbar" placeholder="Search by physician, specialty, location, or notes…">
+            <button id="clearSearch" type="button" class="btn-ghost" style="display:none;">Clear</button>
+          </div>
+
           <div class="dropdown" id="specDropdownWrap">
-            <button class="dropdown-toggle" type="button" id="specDropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" role="button">
+            <button class="dropdown-toggle" type="button" id="specDropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
               Specialties (multi-select)
             </button>
             <div class="dropdown-menu p-2" aria-labelledby="specDropdown">
-              <label class="dropdown-item">
-                <input type="checkbox" id="specAll" checked> <strong>All specialties</strong>
-              </label>
+              <label class="dropdown-item"><input type="checkbox" id="specAll" checked> <strong>All specialties</strong></label>
               <div class="dropdown-divider"></div>
               <% specialties.forEach(function(sp){ %>
-                <label class="dropdown-item">
-                  <input type="checkbox" class="spec-option" value="<%= sp %>"> <%= sp %>
-                </label>
+                <label class="dropdown-item"><input type="checkbox" class="spec-option" value="<%= sp %>"> <%= sp %></label>
               <% }); %>
             </div>
-            <div class="muted" id="specHint">All specialties selected</div>
+            <div class="muted" id="specHint" style="margin-top:6px;">All specialties selected</div>
           </div>
-          <label class="checkbox" style="justify-self:start;">
-            <input id="onlyOpen" type="checkbox" checked>
-            <span>Only show not claimed</span>
-          </label>
+
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <label class="pill-filter" id="onlyOpenPill">
+              <input id="onlyOpen" type="checkbox" checked>
+              <span>Only show not claimed</span>
+            </label>
+          </div>
         </div>
       </div>
 
       <div id="slotList">
-        <% (slots || []).forEach(function(slot){
+        <% (slots || []).forEach(function(slot, i){
              const isPCP2 = ['Family Medicine (PCP)','Primary Care'].includes((slot.physSpecialty||'').trim());
-
-             // Disable reason by phase
              let claimDisabledReason = null;
              if (phase === 0) claimDisabledReason = "View-only phase";
-             else if (phase === 1 && !isPCP2) claimDisabledReason = "PCP-only is active";
+             else if (phase === 1 && !isPCP2) claimDisabledReason = "PCP-only active";
              else if (phase === 2 && (currentCount >= 2)) claimDisabledReason = "Limit of 2 reached";
-
              const claimedState = slot.studentEmail ? (slot.studentEmail === (user && user.email) ? "me" : "other") : "no";
         %>
           <div class="slot-card searchable"
+               style="animation-delay:<%= (i%8)*20 %>ms"
                data-search="<%= [slot.physName, slot.physSpecialty, slot.location, slot.notes].filter(Boolean).join(' ').toLowerCase() %>"
                data-spec="<%= (slot.physSpecialty||'').trim() %>"
                data-claimed="<%= claimedState %>">
@@ -248,7 +266,7 @@
               <% if (phase === 1 && slot.physSpecialty && !isPCP2) { %><span class="pill-nonpcp">Non-PCP</span><% } %>
             </div>
             <div class="muted" style="margin:6px 0;">
-              <strong><%= slot.dDate || '-' %></strong> • <%= (slot.timeStart || '-') %> to <%= (slot.timeEnd || '-') %> • <%= slot.location || '-' %>
+              <strong><%= slot.dDate || '-' %></strong> • <%= slot.timeStart || '-' %> to <%= slot.timeEnd || '-' %> • <%= slot.location || '-' %>
             </div>
             <div class="muted"><%= (slot.notes && slot.notes.trim()) ? slot.notes : '—' %></div>
             <div style="margin-top:10px;">
@@ -258,14 +276,11 @@
                   <input type="hidden" name="userFName" value="<%= user.fName %>">
                   <input type="hidden" name="userLName" value="<%= user.lName %>">
                   <input type="hidden" name="slotId" value="<%= slot._id %>">
-                  <button type="submit" class="btn-soft"
-                    <% if (claimDisabledReason) { %> disabled title="<%= claimDisabledReason %>" <% } %>>
+                  <button type="submit" class="btn-soft" <% if (claimDisabledReason) { %> disabled title="<%= claimDisabledReason %>" <% } %>>
                     Claim
                   </button>
                 </form>
-                <% if (claimDisabledReason) { %>
-                  <span class="muted" style="margin-left:8px;"><%= claimDisabledReason %></span>
-                <% } %>
+                <% if (claimDisabledReason) { %><span class="muted" style="margin-left:8px;"><%= claimDisabledReason %></span><% } %>
               <% } else { %>
                 <% if (slot.studentEmail === (user && user.email)) { %>
                   <form action="/unclaim" method="post" style="display:inline;"
@@ -295,7 +310,9 @@
 
   (function(){
     const q = document.getElementById('search');
+    const clearBtn = document.getElementById('clearSearch');
     const onlyOpen = document.getElementById('onlyOpen');
+    const onlyOpenPill = document.getElementById('onlyOpenPill');
     const cards = Array.from(document.querySelectorAll('#slotList .slot-card'));
 
     // Keep dropdown open when clicking inside it
@@ -322,14 +339,18 @@
       if (query && !(card.dataset.search || '').includes(query)) return false;
       const chosen = specAll?.checked ? [] : selectedSpecs();
       if (chosen.length && !chosen.includes(card.dataset.spec || '')) return false;
-      const onlyOpenBox = onlyOpen && onlyOpen.checked;
       const claimed = card.getAttribute('data-claimed');
-      if (onlyOpenBox && claimed !== 'no') return false;
+      if (onlyOpen && onlyOpen.checked && claimed !== 'no') return false;
       return true;
     }
-    function apply(){ cards.forEach(c => { c.style.display = matches(c) ? '' : 'none'; }); }
+    function apply(){
+      cards.forEach(c => { c.style.display = matches(c) ? '' : 'none'; });
+      clearBtn.style.display = (q && q.value && q.value.length) ? '' : 'none';
+      onlyOpenPill.classList.toggle('off', !(onlyOpen && onlyOpen.checked));
+    }
 
     q?.addEventListener('input', apply);
+    clearBtn?.addEventListener('click', () => { q.value=''; q.focus(); apply(); });
     onlyOpen?.addEventListener('change', apply);
 
     specAll?.addEventListener('change', () => {
@@ -344,7 +365,7 @@
     updateSpecHint(); apply();
   })();
 
-  // Auto-dismiss alerts after 5s, but NOT sticky success banners
+  // Auto-dismiss non-sticky alerts after 5s
   setTimeout(() => {
     document.querySelectorAll('.alert:not(.alert-sticky)').forEach(el => {
       el.style.transition = 'opacity 0.5s ease';
@@ -359,10 +380,7 @@
 <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
 <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
 <script>
-  // Explicitly initialize dropdown
-  $(function () {
-    $('#specDropdown').dropdown();
-  });
+  $(function () { $('#specDropdown').dropdown(); });
 </script>
 
 <%- include("./partials/footer"); -%>
