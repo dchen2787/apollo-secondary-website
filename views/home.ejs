@@ -163,7 +163,7 @@
       <h1 style="margin:0;"><%= user && user.fName ? user.fName : (user?.email || "Student") %></h1>
     </div>
     <div style="margin-left:auto;">
-      <% if ((controls && controls.confirmEnabled) && !confirmed) { %>
+      <% if ((controls && controls.confirmationsEnabled) && !confirmed) { %>
         <form action="/confirm" method="post"
               onsubmit="return confirm('Once you confirm, you can’t remove slots. Continue?')">
           <input type="hidden" name="userEmail" value="<%= user.email %>">
@@ -173,6 +173,7 @@
         <div class="muted" style="margin-top:8px;">You’ve confirmed your slots.</div>
       <% } %>
     </div>
+
   </div>
 
   <!-- Your Matches -->
