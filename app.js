@@ -1501,14 +1501,12 @@ app.post("/admin/toggle-confirmations", async (req, res) => {
 // Admin: match settings (lock toggle, phase, maxSlots)
 app.post("/admin-matchSettings", async function(req, res) {
   try {
-    const phaseValue = Number(req.body.phase ?? 3);
-    const maxSlotsValue = parseInt(req.body.maxSlots || 100, 10);
-    const lockValue = req.body.matchingLock === "true";
+    const phaseValue     = Number(req.body.phase ?? 3);
+    const maxSlotsValue  = parseInt(req.body.maxSlots || 100, 10);
+    const lockValue      = req.body.matchingLock === "true" || req.body.matchingLock === "on";
+    const confirmEnabled = req.body.confirmEnabled === "true" || req.body.confirmEnabled === "on"; // <— READ
 
-    // NEW: confirmEnabled checkbox (e.g., `<input type="checkbox" name="confirmEnabled">`)
-    const confirmEnabled = req.body.confirmEnabled === "on";
-
-    // remember checked groups (optional)...
+    // remember checked groups (optional; leave as-is if you use this)
     for (let i = 0; i < allGroups.length; i++) {
       const box = req.body[allGroups[i][0]];
       allGroups[i][1] = !!box;
@@ -1522,12 +1520,13 @@ app.post("/admin-matchSettings", async function(req, res) {
           PCPonly: (phaseValue === 1),
           matchingLocked: lockValue,
           maxSlots: maxSlotsValue,
-          confirmEnabled // NEW
+          confirmEnabled: confirmEnabled   // <— SAVE
         }
       },
       { upsert: true }
     );
 
+    // legacy propagation (unchanged)
     await Student.updateMany({}, { matchingLocked: lockValue });
 
     return renderAdminHome(res, "Match settings updated.");
@@ -1536,6 +1535,7 @@ app.post("/admin-matchSettings", async function(req, res) {
     return renderAdminHome(res, "Error updating match settings.");
   }
 });
+
 
 // Admin: reset ALL confirmations (clean slate)
 app.post("/admin-reset-confirms", async function(req, res) {
