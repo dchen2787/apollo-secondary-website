@@ -245,6 +245,14 @@
               <input type="number" name="maxSlots" value="<%= maxSlots %>" class="form-control" style="max-width:200px;">
             </div>
 
+            <div class="form-group" style="margin-top:8px;">
+              <label>
+                <input type="checkbox" name="confirmationsEnabled" value="true"
+                       <%= controls && controls.confirmationsEnabled ? "checked" : "" %> >
+                Allow students to confirm now
+              </label>
+            </div>
+
             <div class="form-group" style="margin-top:10px;">
               <label>Matching Lock:</label><br/>
               <label style="margin-right:10px;">
