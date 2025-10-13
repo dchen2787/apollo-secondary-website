@@ -196,7 +196,7 @@
         </div>
         <div class="muted"><%= (slot.notes && slot.notes.trim()) ? slot.notes : '—' %></div>
         <% if (!confirmed) { 
-             const confirmMsg = (phase >= 2) ? "Are you sure you want to remove this slot? You’re in the confirmation phase." : "Remove this slot?";
+             const confirmMsg = (phase >= 2) ? "Remove this slot?" : "Remove this slot?";
         %>
           <form action="/unclaim" method="post" onsubmit="return confirm('<%= confirmMsg %>')">
             <input type="hidden" name="slotId" value="<%= slot._id %>">
