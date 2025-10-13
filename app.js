@@ -105,17 +105,20 @@ const StudentHourLog = mongoose.model("StudentHourLog", hourLogSchema);
 //  phase 2: Max 2
 //  phase 3: Unlimited (or use maxSlots if you set it)
 // "PCPonly" kept for backward compatibility but derived from phase.
+
 const controlSchema = new mongoose.Schema({
-  id: Number,
+  id: { type: Number, default: 1, unique: true, index: true },
   phase: { type: Number, default: 3 },
   maxSlots: { type: Number, default: 100 },
   PCPonly: { type: Boolean, default: false },
   matchingLocked: { type: Boolean, default: false },
 
-  // NEW: gate the student Confirm button
-  confirmEnabled: { type: Boolean, default: false }
-});
+  // gate the student Confirm button
+  confirmationsEnabled: { type: Boolean, default: false }
+}, { strict: true });
+
 const Control = mongoose.model("Control", controlSchema);
+
 
 
 const logSchema = new mongoose.Schema({
@@ -269,7 +272,7 @@ app.use(async (req, res, next) => {
     if (!ctrl) {
       await Control.updateOne(
         { id: 1 },
-        { $setOnInsert: { id:1, phase:3, maxSlots:100, PCPonly:false, matchingLocked:false, confirmEnabled:false } },
+        { $setOnInsert: { id:1, phase:3, maxSlots:100, PCPonly:false, matchingLocked:false, confirmationsEnabled:false } },
         { upsert: true }
       );
       ctrl = await Control.findOne({ id: 1 }).lean();
@@ -279,10 +282,10 @@ app.use(async (req, res, next) => {
       await Control.updateOne({ id:1 }, { $set: { PCPonly: (ctrl.phase === 1) } });
       ctrl.PCPonly = (ctrl.phase === 1);
     }
-    res.locals.controls = ctrl || { phase:3, PCPonly:false, matchingLocked:false, maxSlots:100, confirmEnabled:false };
+    res.locals.controls = ctrl || { phase:3, PCPonly:false, matchingLocked:false, maxSlots:100, confirmationsEnabled:false };
   } catch (e) {
     console.error("Failed to load controls:", e);
-    res.locals.controls = { phase:3, PCPonly:false, matchingLocked:false, maxSlots:100, confirmEnabled:false };
+    res.locals.controls = { phase:3, PCPonly:false, matchingLocked:false, maxSlots:100, confirmationsEnabled:false };
   }
   next();
 });
@@ -1464,49 +1467,18 @@ app.post("/unclaim", async function(req, res) {
   }
 });
 
-// Confirm (sets confirmed flag, greys out button on home)
-// Confirm (sets confirmed flag, greys out button on home)
-app.post("/confirm", async function(req, res) {
-  const userEmail = _.toLower(req.body.userEmail);
 
-  try {
-    // 1) Set confirmed = true
-    await Confirm.updateOne(
-      { email: userEmail },
-      { $set: { confirmed: true } },
-      { upsert: true }
-    );
-
-    // 2) Snapshot current claims → archivedSlots (idempotent)
-    const now = new Date();
-    const season = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-    await snapshotConfirmedSlotsToArchive(userEmail, season);
-
-    return renderHome(res, userEmail, "Successfully confirmed your slots.");
-  } catch (err) {
-    return errorPage(res, err);
-  }
-});
-
-app.post("/admin/toggle-confirmations", async (req, res) => {
-  try {
-    const enabled = req.body.confirmationsEnabled === "true";
-    await Control.updateOne({ id:1 }, { $set: { confirmationsEnabled: enabled } }, { upsert:true });
-    return renderAdminHome(res, `Confirmations ${enabled ? "enabled" : "disabled"}.`);
-  } catch (e) {
-    return errorPage(res, e);
-  }
-});
 
 // Admin: match settings (lock toggle, phase, maxSlots)
 app.post("/admin-matchSettings", async function(req, res) {
   try {
-    const phaseValue     = Number(req.body.phase ?? 3);
-    const maxSlotsValue  = parseInt(req.body.maxSlots || 100, 10);
-    const lockValue      = req.body.matchingLock === "true" || req.body.matchingLock === "on";
-    const confirmEnabled = req.body.confirmEnabled === "true" || req.body.confirmEnabled === "on"; // <— READ
+    const phaseValue            = Number(req.body.phase ?? 3);
+    const maxSlotsValue         = parseInt(req.body.maxSlots || 100, 10);
+    const lockValue             = req.body.matchingLock === "true" || req.body.matchingLock === "on";
+    const confirmationsEnabled  =
+      req.body.confirmationsEnabled === "true" || req.body.confirmationsEnabled === "on";
 
-    // remember checked groups (optional; leave as-is if you use this)
+    // remember checked groups (optional)
     for (let i = 0; i < allGroups.length; i++) {
       const box = req.body[allGroups[i][0]];
       allGroups[i][1] = !!box;
@@ -1520,21 +1492,20 @@ app.post("/admin-matchSettings", async function(req, res) {
           PCPonly: (phaseValue === 1),
           matchingLocked: lockValue,
           maxSlots: maxSlotsValue,
-          confirmEnabled: confirmEnabled   // <— SAVE
+          confirmationsEnabled
         }
       },
       { upsert: true }
     );
 
-    // legacy propagation (unchanged)
     await Student.updateMany({}, { matchingLocked: lockValue });
-
     return renderAdminHome(res, "Match settings updated.");
   } catch (err) {
     console.error("Error updating Control:", err);
     return renderAdminHome(res, "Error updating match settings.");
   }
 });
+
 
 
 // Admin: reset ALL confirmations (clean slate)
