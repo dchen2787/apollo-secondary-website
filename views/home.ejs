@@ -110,17 +110,22 @@
 
 <div class="container">
 
-  <% 
+  <%
     const matchingLocked = !!(controls && controls.matchingLocked);
     const pcpOnlyFlag   = !!(controls && controls.PCPonly);
     const maxAllowed    = (typeof maxSlots === 'number' ? maxSlots : 9999);
     const mySlotsAll    = (slots || []).filter(s => s.studentEmail === (user && user.email));
     const currentCount  = mySlotsAll.length;
-    let phase = 3, phaseNameLabel = "Phase 3: Unlimited";
-    if (matchingLocked) { phase = 0; phaseNameLabel = "Phase 0: View Only"; }
-    else if (pcpOnlyFlag) { phase = 1; phaseNameLabel = "Phase 1: PCP Only"; }
-    else if (maxAllowed === 2) { phase = 2; phaseNameLabel = "Phase 2: Two-slot Limit"; }
+  
+    // Use server-provided phase directly
+    const phase = Number(controls?.phase ?? 3);
+    const phaseNameLabel =
+      phase === 0 ? "Phase 0: View Only" :
+      phase === 1 ? "Phase 1: PCP Only" :
+      phase === 2 ? "Phase 2: Two-slot Limit" :
+                    "Phase 3: Unlimited";
   %>
+
 
   <% if (!matchingLocked) { %>
     <div class="phase-banner p<%= phase %>">
@@ -262,6 +267,7 @@
              const isPCP2 = ['Family Medicine (PCP)','Primary Care'].includes((slot.physSpecialty||'').trim());
              let claimDisabledReason = null;
              if (phase === 0) claimDisabledReason = "View-only phase";
+             else if (matchingLocked) claimDisabledReason = "Matching is locked";
              else if (phase === 1 && !isPCP2) claimDisabledReason = "PCP-only active";
              else if (phase === 2 && (currentCount >= 2)) claimDisabledReason = "Limit of 2 reached";
              const claimedState = slot.studentEmail ? (slot.studentEmail === (user && user.email) ? "me" : "other") : "no";
