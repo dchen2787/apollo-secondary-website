@@ -111,6 +111,9 @@ const controlSchema = new mongoose.Schema({
   maxSlots: { type: Number, default: 100 },     // used when phase === 3 or you want a custom cap
   PCPonly: { type: Boolean, default: false },   // legacy flag; will mirror (phase === 1)
   matchingLocked: { type: Boolean, default: false }
+
+    // NEW: independent confirmation window toggle
+  confirmationsEnabled: { type: Boolean, default: false }
 });
 const Control = mongoose.model("Control", controlSchema);
 
@@ -276,6 +279,13 @@ app.use(async (req, res, next) => {
       await Control.updateOne({ id:1 }, { $set: { PCPonly: (ctrl.phase === 1) } });
       ctrl.PCPonly = (ctrl.phase === 1);
     }
+    
+    // ensure confirmationsEnabled exists if missing
+    if (typeof ctrl.confirmationsEnabled === "undefined") {
+      await Control.updateOne({ id:1 }, { $set: { confirmationsEnabled:false } });
+      ctrl.confirmationsEnabled = false;
+    }
+    
     res.locals.controls = ctrl;
   } catch (e) {
     console.error("Failed to load controls:", e);
@@ -883,6 +893,31 @@ app.post("/admin/students/:email/update", async function(req, res) {
   } catch (e) { return errorPage(res, e); }
 });
 
+//students can only confirm when the switch is ON
+app.post("/confirm", async function(req, res) {
+  const userEmail = _.toLower(req.body.userEmail || "");
+
+  try {
+    const ctrl = await Control.findOne({ id: 1 }).lean();
+    if (!ctrl || ctrl.confirmationsEnabled !== true) {
+      return renderHome(res, userEmail, "Confirmations are not open right now.");
+    }
+
+    await Confirm.updateOne(
+      { email: userEmail },
+      { $set: { confirmed: true } },
+      { upsert: true }
+    );
+
+    const now = new Date();
+    const season = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+    await snapshotConfirmedSlotsToArchive(userEmail, season);
+
+    return renderHome(res, userEmail, "Successfully confirmed your slots.");
+  } catch (err) {
+    return errorPage(res, err);
+  }
+});
 
 // Admin: snapshot ALL currently confirmed students' claims to archivedSlots
 app.post("/admin/archive-confirmed-sweep", async function(req, res) {
@@ -1457,6 +1492,16 @@ app.post("/confirm", async function(req, res) {
     return renderHome(res, userEmail, "Successfully confirmed your slots.");
   } catch (err) {
     return errorPage(res, err);
+  }
+});
+
+app.post("/admin/toggle-confirmations", async (req, res) => {
+  try {
+    const enabled = req.body.confirmationsEnabled === "true";
+    await Control.updateOne({ id:1 }, { $set: { confirmationsEnabled: enabled } }, { upsert:true });
+    return renderAdminHome(res, `Confirmations ${enabled ? "enabled" : "disabled"}.`);
+  } catch (e) {
+    return errorPage(res, e);
   }
 });
 
