@@ -107,15 +107,16 @@ const StudentHourLog = mongoose.model("StudentHourLog", hourLogSchema);
 // "PCPonly" kept for backward compatibility but derived from phase.
 const controlSchema = new mongoose.Schema({
   id: Number,
-  phase: { type: Number, default: 3 },          // NEW
-  maxSlots: { type: Number, default: 100 },     // used when phase === 3 or you want a custom cap
-  PCPonly: { type: Boolean, default: false },   // legacy flag; will mirror (phase === 1)
-  matchingLocked: { type: Boolean, default: false }
+  phase: { type: Number, default: 3 },
+  maxSlots: { type: Number, default: 100 },
+  PCPonly: { type: Boolean, default: false },
+  matchingLocked: { type: Boolean, default: false },
 
-    // NEW: independent confirmation window toggle
-  confirmationsEnabled: { type: Boolean, default: false }
+  // NEW: gate the student Confirm button
+  confirmEnabled: { type: Boolean, default: false }
 });
 const Control = mongoose.model("Control", controlSchema);
+
 
 const logSchema = new mongoose.Schema({
   time:String, type:String, user:String, update:String, slot: String
@@ -266,30 +267,22 @@ app.use(async (req, res, next) => {
   try {
     let ctrl = await Control.findOne({ id: 1 }).lean();
     if (!ctrl) {
-      // seed a default control doc
       await Control.updateOne(
         { id: 1 },
-        { $setOnInsert: { id:1, phase:3, maxSlots:100, PCPonly:false, matchingLocked:false } },
+        { $setOnInsert: { id:1, phase:3, maxSlots:100, PCPonly:false, matchingLocked:false, confirmEnabled:false } },
         { upsert: true }
       );
       ctrl = await Control.findOne({ id: 1 }).lean();
     }
-    // ensure legacy PCPonly mirrors phase 1
+    // keep PCPonly mirrored to phase 1 for legacy UI
     if (ctrl.PCPonly !== (ctrl.phase === 1)) {
       await Control.updateOne({ id:1 }, { $set: { PCPonly: (ctrl.phase === 1) } });
       ctrl.PCPonly = (ctrl.phase === 1);
     }
-    
-    // ensure confirmationsEnabled exists if missing
-    if (typeof ctrl.confirmationsEnabled === "undefined") {
-      await Control.updateOne({ id:1 }, { $set: { confirmationsEnabled:false } });
-      ctrl.confirmationsEnabled = false;
-    }
-    
-    res.locals.controls = ctrl;
+    res.locals.controls = ctrl || { phase:3, PCPonly:false, matchingLocked:false, maxSlots:100, confirmEnabled:false };
   } catch (e) {
     console.error("Failed to load controls:", e);
-    res.locals.controls = null;
+    res.locals.controls = { phase:3, PCPonly:false, matchingLocked:false, maxSlots:100, confirmEnabled:false };
   }
   next();
 });
@@ -1512,7 +1505,10 @@ app.post("/admin-matchSettings", async function(req, res) {
     const maxSlotsValue = parseInt(req.body.maxSlots || 100, 10);
     const lockValue = req.body.matchingLock === "true";
 
-    // remember checked groups (optional)
+    // NEW: confirmEnabled checkbox (e.g., `<input type="checkbox" name="confirmEnabled">`)
+    const confirmEnabled = req.body.confirmEnabled === "on";
+
+    // remember checked groups (optional)...
     for (let i = 0; i < allGroups.length; i++) {
       const box = req.body[allGroups[i][0]];
       allGroups[i][1] = !!box;
@@ -1525,13 +1521,13 @@ app.post("/admin-matchSettings", async function(req, res) {
           phase: phaseValue,
           PCPonly: (phaseValue === 1),
           matchingLocked: lockValue,
-          maxSlots: maxSlotsValue
+          maxSlots: maxSlotsValue,
+          confirmEnabled // NEW
         }
       },
       { upsert: true }
     );
 
-    // propagate "matchingLocked" per-student display flag (legacy behavior)
     await Student.updateMany({}, { matchingLocked: lockValue });
 
     return renderAdminHome(res, "Match settings updated.");
