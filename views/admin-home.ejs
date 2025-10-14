@@ -81,6 +81,7 @@
       <a class="nav-link" href="#sec-students">Student Hours <span>➜</span></a>
       <a class="nav-link" href="#sec-schools">Hours by School <span>➜</span></a>
       <a class="nav-link" href="#sec-match">Match Settings <span>➜</span></a>
+      <a class="nav-link" href="#sec-scheduler">Schedule Match <span>➜</span></a>
       <a class="nav-link" href="#sec-confirms">Confirm Controls <span>➜</span></a>
       <a class="nav-link" href="#sec-slots">Shadow Slots <span>➜</span></a>
     </nav>
@@ -264,6 +265,106 @@
             </div>
             <button type="submit" class="btn" style="margin-top:12px;">Update Access</button>
           </form>
+        </div>
+      </section>
+      <!-- Phase Scheduler -->
+      <section id="sec-scheduler" class="cardish">
+        <div class="section-head">
+          <h2>Phase Scheduler</h2>
+          <button class="btn-toggle" data-target="#schedulerBody">Collapse</button>
+        </div>
+      
+        <div id="schedulerBody">
+          <p class="muted" style="margin-top:-6px;">
+            Create future changes to phase / lock / cap / confirmations. The server checks every ~30s and applies any due entries.
+          </p>
+      
+          <!-- Add new schedule -->
+          <form action="/admin/schedule/add" method="post" class="form-inline" style="gap:10px; flex-wrap:wrap;">
+            <div>
+              <label style="display:block; font-weight:600;">Apply at:</label>
+              <input type="datetime-local" name="at" required class="form-control" style="min-width:220px;">
+              <input type="hidden" name="tzOffsetMin" id="tzOffsetMin">
+            </div>
+      
+            <div>
+              <label style="display:block; font-weight:600;">Phase</label>
+              <label><input type="radio" name="phase" value="0"> 0 — View only</label>
+              <label><input type="radio" name="phase" value="1"> 1 — PCP only</label>
+              <label><input type="radio" name="phase" value="2"> 2 — Up to 2</label>
+              <label><input type="radio" name="phase" value="3" checked> 3 — Unlimited</label>
+            </div>
+      
+            <div>
+              <label style="display:block; font-weight:600;">Matching Lock</label>
+              <label><input type="radio" name="matchingLock" value="t"> Locked</label>
+              <label><input type="radio" name="matchingLock" value="f" checked> Unlocked</label>
+            </div>
+      
+            <div>
+              <label style="display:block; font-weight:600;">Max Slots</label>
+              <input type="number" name="maxSlots" value="<%= (controls && controls.maxSlots) || 100 %>" class="form-control" style="max-width:120px;">
+            </div>
+      
+            <div>
+              <label style="display:block; font-weight:600;">Confirmations</label>
+              <label>
+                <input type="checkbox" name="confirmationsEnabled" value="true"
+                       <%= controls && controls.confirmationsEnabled ? "checked" : "" %> >
+                Allow students to confirm
+              </label>
+            </div>
+      
+            <div style="flex:1 0 100%;">
+              <input class="input" name="note" placeholder="Optional note (e.g., 'Open Phase 2 at noon for 2025 group')">
+            </div>
+      
+            <button class="btn" type="submit">Add Schedule</button>
+          </form>
+      
+          <script>
+            // send browser timezone offset (in minutes) so server can compute UTC correctly
+            document.getElementById('tzOffsetMin').value = new Date().getTimezoneOffset() * -1;
+          </script>
+      
+          <div class="divider" style="margin:14px 0;"></div>
+      
+          <!-- Upcoming / History -->
+          <h5>Scheduled Changes</h5>
+          <div class="row row-head">
+            <div class="col col-3">Apply At</div>
+            <div class="col col-5">Change</div>
+            <div class="col col-2">Status</div>
+            <div class="col col-2">Actions</div>
+          </div>
+          <div class="divider"></div>
+      
+          <% (schedules || []).forEach(function(s) { 
+               const status = s.appliedAt ? ("Applied " + new Date(s.appliedAt).toLocaleString()) : "Pending";
+          %>
+            <div class="row">
+              <div class="col col-3"><%= new Date(s.at).toLocaleString() %></div>
+              <div class="col col-5">
+                Phase <strong><%= s.phase %></strong>,
+                Lock: <%= s.matchingLocked ? "Locked" : "Unlocked" %>,
+                MaxSlots: <%= s.maxSlots %>,
+                Confirmations: <%= s.confirmationsEnabled ? "On" : "Off" %>
+                <div class="muted"><%= s.note || "" %></div>
+              </div>
+              <div class="col col-2"><%= status %></div>
+              <div class="col col-2">
+                <% if (!s.appliedAt) { %>
+                  <form action="/admin/schedule/apply-now/<%= s._id %>" method="post" style="display:inline;">
+                    <button class="btn btn-sm" onclick="return confirm('Apply now?')">Apply Now</button>
+                  </form>
+                <% } %>
+                <form action="/admin/schedule/delete/<%= s._id %>" method="post" style="display:inline;">
+                  <button class="btn btn-sm" onclick="return confirm('Delete this entry?')">Delete</button>
+                </form>
+              </div>
+            </div>
+            <div class="divider"></div>
+          <% }) %>
         </div>
       </section>
 
