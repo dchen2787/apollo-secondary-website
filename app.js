@@ -422,6 +422,7 @@ async function renderAdminHome(res, flashMsg = "", lyteOnly = false) {
       Confirm.find({}).lean(),
       Control.findOne({ id: 1 }).lean(),
       Student.find({}).lean()
+      PhaseSchedule.find({}).sort({ appliedAt: 1, at: 1 }).lean()   // <-- add
     ]);
 
     const activeStudents   = students.filter(s => !s.isArchived);
@@ -444,7 +445,9 @@ async function renderAdminHome(res, flashMsg = "", lyteOnly = false) {
       studentHours: activeHours,         // hours list = active only
       archivedStudentHours: archivedHours,
       hoursBySchool,
-      lyteOnly
+      lyteOnly,
+      
+      schedules
     });
   } catch (e) {
     return errorPage(res, e);
@@ -1729,7 +1732,7 @@ function localDatetimeToUTC(datetimeLocalStr, tzOffsetMinutes) {
   // Treat local value as if it were in the browser's TZ; convert to UTC ms.
   const ms = Date.UTC(Y, (M - 1), D, h, m);
   // Browser tzOffsetMinutes is typically negative in the Americas (e.g., -240).
-  return new Date(ms + (tzOffsetMinutes * 60 * 1000));
+  return new Date(ms - (tzOffsetMinutes * 60 * 1000));
 }
 
 // Apply all schedules whose time has passed and are not yet applied.
