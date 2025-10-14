@@ -90,6 +90,25 @@ archivedSlotSchema.index({ studentEmail: 1, sourceSlotId: 1 }, { unique: true })
 // IMPORTANT: 3rd arg forces the collection name to be exactly "archivedSlots"
 const ArchivedSlot = mongoose.model("ArchivedSlot", archivedSlotSchema, "archivedSlots");
 
+
+// --- Phase Scheduler ---
+const phaseScheduleSchema = new mongoose.Schema({
+  at: { type: Date, required: true, index: true },  // when to apply
+  phase: { type: Number, required: true },          // 0..3
+  matchingLocked: { type: Boolean, default: false },
+  maxSlots: { type: Number, default: 100 },
+  confirmationsEnabled: { type: Boolean, default: false },
+
+  note: { type: String, default: "" },
+
+  appliedAt: { type: Date, default: null, index: true }, // set once applied
+  createdBy: { type: String, default: "" },              // admin email (optional)
+  createdAt: { type: Date, default: Date.now }
+}, { strict: true });
+
+const PhaseSchedule = mongoose.model("PhaseSchedule", phaseScheduleSchema);
+
+
 // Hour logger (simple adjustments: +/− hours with reason)
 const hourLogSchema = new mongoose.Schema({
   studentEmail: { type: String, index: true },
@@ -345,6 +364,8 @@ async function renderHome(res, userEmail, errM = "") {
       errM,
       confirmed,
       isConfirmed: confirmed
+
+      schedules
     });
   } catch (e) {
     console.error(e);
@@ -933,6 +954,78 @@ app.post("/admin/archive-confirmed-sweep", async function(req, res) {
     return errorPage(res, err);
   }
 });
+
+
+// Create a new scheduled change
+app.post("/admin/schedule/add", async function(req, res) {
+  try {
+    const phase = parseInt(req.body.phase, 10);
+    if (![0,1,2,3].includes(phase)) throw new Error("Invalid phase");
+
+    const matchingLocked = (req.body.matchingLock === "t");
+    const maxSlots = parseInt(req.body.maxSlots || "100", 10);
+    const confirmationsEnabled = (req.body.confirmationsEnabled === "true");
+
+    // Browser sends local datetime and tz offset minutes
+    const tzOffsetMin = parseInt(req.body.tzOffsetMin || "0", 10);
+    const atLocal = req.body.at; // "YYYY-MM-DDTHH:mm"
+    if (!atLocal) throw new Error("Missing schedule time");
+
+    const at = localDatetimeToUTC(atLocal, tzOffsetMin);
+
+    await PhaseSchedule.create({
+      at,
+      phase,
+      matchingLocked,
+      maxSlots: Number.isFinite(maxSlots) ? maxSlots : 100,
+      confirmationsEnabled,
+      note: (req.body.note || "").trim(),
+      createdBy: "" // (optional: fill from session if you have admin auth)
+    });
+
+    return renderAdminHome(res, "Scheduled phase change added.");
+  } catch (e) {
+    return errorPage(res, e);
+  }
+});
+
+// Delete a pending or applied schedule
+app.post("/admin/schedule/delete/:id", async function(req, res) {
+  try {
+    await PhaseSchedule.deleteOne({ _id: req.params.id });
+    return renderAdminHome(res, "Schedule entry removed.");
+  } catch (e) {
+    return errorPage(res, e);
+  }
+});
+
+// Manually apply a schedule now (useful for testing)
+app.post("/admin/schedule/apply-now/:id", async function(req, res) {
+  try {
+    const item = await PhaseSchedule.findById(req.params.id).lean();
+    if (!item) throw new Error("Not found");
+
+    await Control.updateOne(
+      { id: 1 },
+      {
+        $set: {
+          phase: item.phase,
+          PCPonly: (item.phase === 1),
+          matchingLocked: !!item.matchingLocked,
+          maxSlots: Number.isFinite(item.maxSlots) ? item.maxSlots : 100,
+          confirmationsEnabled: !!item.confirmationsEnabled
+        }
+      },
+      { upsert: true }
+    );
+    await PhaseSchedule.updateOne({ _id: item._id }, { $set: { appliedAt: new Date() } });
+
+    return renderAdminHome(res, "Schedule applied immediately.");
+  } catch (e) {
+    return errorPage(res, e);
+  }
+});
+
 
 // --- Admin: Add a slot to this student (claim) ---
 app.post("/admin/students/:email/add-slot", async function(req, res) {
@@ -1625,6 +1718,61 @@ async function dedupeCollection(Model, collectionName) {
     purgeOldArchivedHistory().catch(err => console.error("[purge] interval error:", err));
   }, DAY_MS);
 })();
+
+// Helper to convert browser "datetime-local" + tzOffset to a UTC Date.
+// (If you reuse this on POST handlers below, you can move it up.)
+function localDatetimeToUTC(datetimeLocalStr, tzOffsetMinutes) {
+  // datetimeLocalStr: "YYYY-MM-DDTHH:mm"
+  const [d, t] = String(datetimeLocalStr).split("T");
+  const [Y, M, D] = d.split("-").map(Number);
+  const [h, m] = (t || "00:00").split(":").map(Number);
+  // Treat local value as if it were in the browser's TZ; convert to UTC ms.
+  const ms = Date.UTC(Y, (M - 1), D, h, m);
+  // Browser tzOffsetMinutes is typically negative in the Americas (e.g., -240).
+  return new Date(ms + (tzOffsetMinutes * 60 * 1000));
+}
+
+// Apply all schedules whose time has passed and are not yet applied.
+async function applyDuePhaseSchedules() {
+  const now = new Date();
+  const due = await PhaseSchedule.find({
+    appliedAt: null,
+    at: { $lte: now }
+  }).sort({ at: 1 }).limit(10).lean();
+
+  for (const item of due) {
+    // Update the single Control doc
+    await Control.updateOne(
+      { id: 1 },
+      {
+        $set: {
+          phase: item.phase,
+          PCPonly: (item.phase === 1),
+          matchingLocked: !!item.matchingLocked,
+          maxSlots: Number.isFinite(item.maxSlots) ? item.maxSlots : 100,
+          confirmationsEnabled: !!item.confirmationsEnabled
+        }
+      },
+      { upsert: true }
+    );
+
+    // Mark schedule as applied
+    await PhaseSchedule.updateOne(
+      { _id: item._id, appliedAt: null },
+      { $set: { appliedAt: new Date() } }
+    );
+
+    console.log(`[scheduler] Applied #${item._id} → phase=${item.phase} at ${new Date().toISOString()}`);
+  }
+}
+
+// Kick off the scheduler: every 30 seconds
+setInterval(() => {
+  applyDuePhaseSchedules().catch(err =>
+    console.error("[scheduler] error:", err)
+  );
+}, 30 * 1000);
+
 
 app.listen(port, function() {
   console.log("Server started!");
