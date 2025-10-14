@@ -93,18 +93,21 @@ const ArchivedSlot = mongoose.model("ArchivedSlot", archivedSlotSchema, "archive
 
 // --- Phase Scheduler ---
 const phaseScheduleSchema = new mongoose.Schema({
-  at: { type: Date, required: true, index: true },  // when to apply
-  phase: { type: Number, required: true },          // 0..3
+  at: { type: Date, required: true, index: true },
+  phase: { type: Number, required: true },
   matchingLocked: { type: Boolean, default: false },
   maxSlots: { type: Number, default: 100 },
   confirmationsEnabled: { type: Boolean, default: false },
-
   note: { type: String, default: "" },
 
-  appliedAt: { type: Date, default: null, index: true }, // set once applied
-  createdBy: { type: String, default: "" },              // admin email (optional)
+  // unique dedupe signature
+  sig: { type: String, required: true, unique: true, index: true },
+
+  appliedAt: { type: Date, default: null, index: true },
+  createdBy: { type: String, default: "" },
   createdAt: { type: Date, default: Date.now }
 }, { strict: true });
+
 
 const PhaseSchedule = mongoose.model("PhaseSchedule", phaseScheduleSchema);
 
@@ -587,8 +590,10 @@ app.get("/", function(req,res){
 });
 app.get("/admin", function(req,res){
   const lyteOnly = String(req.query.lyte || "").toLowerCase() === "true";
-  return renderAdminHome(res, "", lyteOnly);
+  const msg = req.query.msg ? decodeURIComponent(req.query.msg) : "";
+  return renderAdminHome(res, msg, lyteOnly);
 });
+
 app.get("/admin-login", function(req,res){
   res.render("admin-login", {errM:""});
 });
@@ -968,28 +973,45 @@ app.post("/admin/schedule/add", async function(req, res) {
     const maxSlots = parseInt(req.body.maxSlots || "100", 10);
     const confirmationsEnabled = (req.body.confirmationsEnabled === "true");
 
-    // Browser sends local datetime and tz offset minutes
     const tzOffsetMin = parseInt(req.body.tzOffsetMin || "0", 10);
     const atLocal = req.body.at; // "YYYY-MM-DDTHH:mm"
     if (!atLocal) throw new Error("Missing schedule time");
 
     const at = localDatetimeToUTC(atLocal, tzOffsetMin);
 
-    await PhaseSchedule.create({
-      at,
+    // ----- DEDUPE GUARD (see schema changes below) -----
+    const sig = [
+      at.toISOString(),
       phase,
-      matchingLocked,
-      maxSlots: Number.isFinite(maxSlots) ? maxSlots : 100,
-      confirmationsEnabled,
-      note: (req.body.note || "").trim(),
-      createdBy: "" // (optional: fill from session if you have admin auth)
-    });
+      matchingLocked ? 1 : 0,
+      Number.isFinite(maxSlots) ? maxSlots : 100,
+      confirmationsEnabled ? 1 : 0,
+      (req.body.note || "").trim()
+    ].join("|");
 
-    return renderAdminHome(res, "Scheduled phase change added.");
+    await PhaseSchedule.updateOne(
+      { sig }, // unique signature
+      {
+        $setOnInsert: {
+          at,
+          phase,
+          matchingLocked,
+          maxSlots: Number.isFinite(maxSlots) ? maxSlots : 100,
+          confirmationsEnabled,
+          note: (req.body.note || "").trim(),
+          createdBy: ""
+        }
+      },
+      { upsert: true }
+    );
+
+    // POST-REDIRECT-GET to avoid re-submission on refresh
+    return res.redirect("/admin?msg=Scheduled%20phase%20change%20added.");
   } catch (e) {
     return errorPage(res, e);
   }
 });
+
 
 // Delete a pending or applied schedule
 app.post("/admin/schedule/delete/:id", async function(req, res) {
