@@ -343,7 +343,9 @@
                const status = s.appliedAt ? ("Applied " + new Date(s.appliedAt).toLocaleString()) : "Pending";
           %>
             <div class="row">
-              <div class="col col-3"><%= new Date(s.at).toLocaleString() %></div>
+              <div class="col col-3">
+                <span class="local-dt" data-iso="<%= new Date(s.at).toISOString() %>">...</span>
+              </div>
               <div class="col col-5">
                 Phase <strong><%= s.phase %></strong>,
                 Lock: <%= s.matchingLocked ? "Locked" : "Unlocked" %>,
@@ -351,7 +353,15 @@
                 Confirmations: <%= s.confirmationsEnabled ? "On" : "Off" %>
                 <div class="muted"><%= s.note || "" %></div>
               </div>
-              <div class="col col-2"><%= status %></div>
+              <div class="col col-2">
+                <% if (s.appliedAt) { %>
+                  <span class="badge badge-success">
+                    Applied <span class="local-dt" data-iso="<%= new Date(s.appliedAt).toISOString() %>">...</span>
+                  </span>
+                <% } else { %>
+                  <span class="badge badge-warning">Pending</span>
+                <% } %>
+              </div>
               <div class="col col-2">
                 <% if (!s.appliedAt) { %>
                   <form action="/admin/schedule/apply-now/<%= s._id %>" method="post" style="display:inline;">
@@ -536,6 +546,16 @@
     };
     confirmSearch.addEventListener('input', apply2);
   }
+</script>
+
+<!-- Convert UTC timestamps to local browser time -->
+<script>
+  document.querySelectorAll('.local-dt').forEach(el => {
+    const iso = el.getAttribute('data-iso');
+    if (!iso) return;
+    const d = new Date(iso);
+    el.textContent = d.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+  });
 </script>
 
 <%- include("./partials/footer"); -%>
