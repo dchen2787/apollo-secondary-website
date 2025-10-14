@@ -7,27 +7,7 @@
     ✅ <%= errM %>
   </div>
 <% } %>
-/* Scheduler design */
-.scheduler-grid {
-  display: grid; grid-template-columns: repeat(4, minmax(180px,1fr));
-  gap: 12px; align-items: end;
-}
-@media (max-width: 991px) { .scheduler-grid { grid-template-columns: 1fr 1fr; } }
-@media (max-width: 600px) { .scheduler-grid { grid-template-columns: 1fr; } }
 
-.form-legend { font-weight: 700; margin: 8px 0 6px; }
-.badge { display:inline-block; padding:4px 8px; border-radius:999px; font-size:12px; }
-.badge-success { background:#ecfdf5; color:#065f46; border:1px solid #34d399; }
-.badge-warning { background:#fff7ed; color:#9a3412; border:1px solid #fdba74; }
-.badge-info { background:#eff6ff; color:#1d4ed8; border:1px solid #93c5fd; }
-
-.tableish { width:100%; border-collapse: collapse; }
-.tableish th, .tableish td { padding:8px 10px; border-bottom:1px solid #e5e7eb; vertical-align: top; }
-.tableish th { text-align:left; font-weight:700; }
-.row-actions { display:flex; gap:8px; flex-wrap:wrap; }
-.btn-sm { padding:6px 10px; border:1px solid #e5e7eb; background:#f8f9fa; border-radius:8px; }
-.btn-danger { background:#fee2e2; border-color:#fecaca; }
-.help-text { color:#6b7280; font-size:13px; margin-top:6px; }
 
 <style>
   .admin-wrap {
@@ -86,6 +66,29 @@
   .row { align-items: center; }
 
   .phase-note { font-size: 13px; color: #374151; margin-top:6px; }
+
+  /* Scheduler design */
+  .scheduler-grid {
+    display: grid; grid-template-columns: repeat(4, minmax(180px,1fr));
+    gap: 12px; align-items: end;
+  }
+  @media (max-width: 991px) { .scheduler-grid { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 600px) { .scheduler-grid { grid-template-columns: 1fr; } }
+  
+  .form-legend { font-weight: 700; margin: 8px 0 6px; }
+  .badge { display:inline-block; padding:4px 8px; border-radius:999px; font-size:12px; }
+  .badge-success { background:#ecfdf5; color:#065f46; border:1px solid #34d399; }
+  .badge-warning { background:#fff7ed; color:#9a3412; border:1px solid #fdba74; }
+  .badge-info { background:#eff6ff; color:#1d4ed8; border:1px solid #93c5fd; }
+  
+  .tableish { width:100%; border-collapse: collapse; }
+  .tableish th, .tableish td { padding:8px 10px; border-bottom:1px solid #e5e7eb; vertical-align: top; }
+  .tableish th { text-align:left; font-weight:700; }
+  .row-actions { display:flex; gap:8px; flex-wrap:wrap; }
+  .btn-sm { padding:6px 10px; border:1px solid #e5e7eb; background:#f8f9fa; border-radius:8px; }
+  .btn-danger { background:#fee2e2; border-color:#fecaca; }
+  .help-text { color:#6b7280; font-size:13px; margin-top:6px; }
+
 </style>
 
 <div class="container">
