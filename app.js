@@ -364,8 +364,6 @@ async function renderHome(res, userEmail, errM = "") {
       errM,
       confirmed,
       isConfirmed: confirmed
-
-      schedules
     });
   } catch (e) {
     console.error(e);
@@ -417,13 +415,14 @@ function buildAdminAnalytics(allSlots, allStudents, lyteOnly = false) {
 
 async function renderAdminHome(res, flashMsg = "", lyteOnly = false) {
   try {
-    const [slots, confirms, ctrl, students] = await Promise.all([
+    const [slots, confirms, ctrl, students, schedules] = await Promise.all([
       Slot.find({}).lean(),
       Confirm.find({}).lean(),
       Control.findOne({ id: 1 }).lean(),
-      Student.find({}).lean()
-      PhaseSchedule.find({}).sort({ appliedAt: 1, at: 1 }).lean()   // <-- add
+      Student.find({}).lean(),
+      PhaseSchedule.find({}).sort({ appliedAt: 1, at: 1 }).lean()
     ]);
+
 
     const activeStudents   = students.filter(s => !s.isArchived);
     const archivedStudents = students.filter(s =>  s.isArchived);
