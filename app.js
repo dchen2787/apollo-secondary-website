@@ -137,6 +137,11 @@ const controlSchema = new mongoose.Schema({
 
   // gate the student Confirm button
   confirmationsEnabled: { type: Boolean, default: false }
+
+    // NEW — site banner controls
+  bannerEnabled: { type: Boolean, default: false },
+  bannerText:    { type: String,  default: "" },
+  bannerStyle:   { type: String,  enum: ["info","success","warning","danger"], default: "info" }
 }, { strict: true });
 
 const Control = mongoose.model("Control", controlSchema);
@@ -916,6 +921,33 @@ app.post("/admin/students/:email/update", async function(req, res) {
     res.redirect(req.get("Referer") || ("/admin/students/" + encodeURIComponent(email)));
   } catch (e) { return errorPage(res, e); }
 });
+
+// Admin: set/clear student banner
+app.post("/admin-banner", async function(req, res) {
+  try {
+    const enabled = req.body.bannerEnabled === "on" || req.body.bannerEnabled === "true";
+    const text    = (req.body.bannerText || "").trim();
+    const style   = (req.body.bannerStyle || "info");
+
+    await Control.updateOne(
+      { id: 1 },
+      {
+       $set: {
+          bannerEnabled: enabled && !!text,  // only enable if there IS text
+          bannerText: text,
+          bannerStyle: style
+        }
+      },
+      { upsert: true }
+    );
+
+    // little status line at the top of Admin page
+    return renderAdminHome(res, enabled && text ? "Student banner updated." : "Student banner cleared.");
+  } catch (err) {
+    return errorPage(res, err);
+  }
+});
+
 
 //students can only confirm when the switch is ON
 app.post("/confirm", async function(req, res) {
