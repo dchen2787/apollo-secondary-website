@@ -133,6 +133,43 @@
         <button class="btn">Archive by Grad Year</button>
       </form>
 
+      <form method="POST" action="/admin-banner" class="card">
+        <div class="card-head">
+          <h3 style="margin:0;">Student Banner</h3>
+          <div class="muted">Optional announcement shown on student home.</div>
+        </div>
+      
+        <div class="divider"></div>
+      
+        <div style="display:grid; gap:12px;">
+          <label style="display:flex; align-items:center; gap:10px;">
+            <input type="checkbox" name="bannerEnabled"
+                   <%= (controls && controls.bannerEnabled) ? "checked" : "" %> />
+            <span>Enable banner</span>
+          </label>
+      
+          <label style="font-weight:600;">Message</label>
+          <textarea name="bannerText" rows="3" placeholder="Type the banner message..."
+                    style="width:100%; border:1px solid #e5e7eb; border-radius:10px; padding:10px;"><%= (controls && controls.bannerText) ? controls.bannerText : "" %></textarea>
+      
+          <div>
+            <label style="font-weight:600; display:block; margin-bottom:6px;">Style</label>
+            <select name="bannerStyle" style="border:1px solid #e5e7eb; border-radius:10px; padding:8px 10px;">
+              <option value="info"    <%= (controls?.bannerStyle==="info")    ? "selected" : "" %>>Info (blue)</option>
+              <option value="success" <%= (controls?.bannerStyle==="success") ? "selected" : "" %>>Success (green)</option>
+              <option value="warning" <%= (controls?.bannerStyle==="warning") ? "selected" : "" %>>Warning (amber)</option>
+              <option value="danger"  <%= (controls?.bannerStyle==="danger")  ? "selected" : "" %>>Danger (red)</option>
+            </select>
+          </div>
+      
+          <div style="display:flex; gap:10px;">
+            <button type="submit" class="btn btn-primary">Save Banner</button>
+            <button type="submit" class="btn" name="bannerEnabled" value="false"
+                    onclick="document.querySelector('[name=bannerText]').value=''">Clear</button>
+          </div>
+        </div>
+      </form>
+
       <!-- Create Accounts -->
       <section id="sec-accounts" class="cardish">
         <div class="section-head">
