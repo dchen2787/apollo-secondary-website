@@ -136,7 +136,7 @@ const controlSchema = new mongoose.Schema({
   matchingLocked: { type: Boolean, default: false },
 
   // gate the student Confirm button
-  confirmationsEnabled: { type: Boolean, default: false }
+  confirmationsEnabled: { type: Boolean, default: false },
 
     // NEW — site banner controls
   bannerEnabled: { type: Boolean, default: false },
